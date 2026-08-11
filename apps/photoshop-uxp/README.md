@@ -53,6 +53,10 @@ Panel default base URL: `https://localhost:8787`.
 
 - Photoshop on macOS requires HTTPS and a locally trusted certificate.
 - Photoshop on Windows may use `http://127.0.0.1:8787` for loopback development.
+- Before its first business request, each client performs a bounded same-origin
+  `GET /healthz`, validates and caches the opaque local session token, and sends
+  it as `X-CineVFX-Session` on every `/v1` request. The token is not exposed by
+  the public client, task state, logs, or panel UI.
 
 Endpoints (metadata only):
 
@@ -72,10 +76,11 @@ Endpoints (metadata only):
    source manifest.
 4. Load / reload the plugin against Photoshop.
 5. Open the **CineVFX** panel from the Photoshop Plugins menu.
-6. In this phase, verify plugin loading, UI, and local proxy planning only.
-   Submit, Cancel, and network-backed Import on macOS require the trusted-HTTPS
-   Mock API added by the next integration phase. The current Mock API is HTTP
-   only, and Photoshop UXP on macOS does not support plain HTTP.
+6. For network actions, start the Mock API with an explicit TLS key and
+   certificate as documented by `apps/api-server/README.md`, then trust that
+   development certificate locally. Repository Node integration tests verify
+   the real socket protocol only; Photoshop UXP runtime certificate trust and
+   end-to-end Photoshop networking remain **UNVERIFIED**.
 
 ## Development install (Windows)
 
@@ -84,8 +89,9 @@ Endpoints (metadata only):
 3. In UXP Developer Tool, add
    `apps\photoshop-uxp\dist\plugin\manifest.json`.
 4. Load the plugin and open the **CineVFX** panel.
-5. For the default non-TLS Mock API, change the panel URL to
-   `http://127.0.0.1:8787`.
+5. For explicit HTTP development, start the Mock API with
+   `CINEVFX_MOCK_ALLOW_HTTP=1` and change the panel URL to
+   `http://127.0.0.1:8787`. The canonical/default path remains trusted HTTPS.
 6. Windows runtime (Photoshop on Windows) is **UNVERIFIED** in this repository phase.
 
 There is **no** one-click signed installer and **no** marketplace package in this

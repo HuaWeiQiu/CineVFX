@@ -13,6 +13,8 @@ const ABSOLUTE_PATH_NO_SPACES =
 const DATA_URL = /data:[a-z0-9.+/-]+;base64,[a-z0-9+/=\s]+/gi;
 const BEARER = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const BASIC_AUTH = /\bBasic\s+[A-Za-z0-9._~+/=-]+/gi;
+const CINEVFX_SESSION =
+  /\bX-CineVFX-Session["']?\s*(?::|=>?|,)\s*(?:\[\s*)?["']?[A-Za-z0-9_-]{32,128}(?![A-Za-z0-9_-])["']?(?:\s*\])?/gi;
 const HTTP_URL = /\bhttps?:\/\/[^\s<>"']+/gi;
 const FILE_URI_NO_SPACES = /\bfile:\/\/\/?[^\s<>"']+/gi;
 const PATH_WITH_EXTENSION = new RegExp(
@@ -59,6 +61,7 @@ export function redactValue(value, depth = 0) {
  */
 function isSensitiveKey(key) {
   if (typeof key !== "string") return false;
+  if (/^x-cinevfx-session$/i.test(key)) return true;
   if (SENSITIVE_KEY.test(key)) return true;
   // Common path-ish suffixes even when not matched by the full regex.
   if (/(?:^|[_-])path$/i.test(key)) return true;
@@ -94,6 +97,7 @@ export function redactString(text) {
     .replace(DATA_URL, "data:[redacted]")
     .replace(BEARER, "Bearer [redacted]")
     .replace(BASIC_AUTH, "Basic [redacted]")
+    .replace(CINEVFX_SESSION, "X-CineVFX-Session: [redacted]")
     .replace(PATH_WITH_EXTENSION, "[path-redacted]")
     .replace(FILE_URI_NO_SPACES, "[path-redacted]")
     .replace(SPACED_ABSOLUTE_PATH_TO_LINE_END, "[path-redacted]")

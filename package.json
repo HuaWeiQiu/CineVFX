@@ -8,7 +8,8 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "check": "node scripts/check-project.mjs",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test tests/bootstrap.test.mjs tests/integration/uxp-api-network.test.mjs",
+    "test:integration": "node --test tests/integration/uxp-api-network.test.mjs",
     "build": "node scripts/build.mjs"
   },
   "engines": {

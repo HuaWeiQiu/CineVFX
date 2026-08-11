@@ -7,9 +7,12 @@ import {
 import {
   createMockFetch,
   digest,
+  TEST_SESSION_TOKEN,
   validAssetDescriptor,
+  validHealthResponse,
   validJobRequest,
   validManifest,
+  withSessionBootstrap,
 } from "./fixtures.mjs";
 import { MOCK_ENDPOINTS } from "../src/constants.mjs";
 import { assertBoundedJsonBody } from "../src/client/contract-shapes.mjs";
@@ -495,7 +498,148 @@ describe("createCinevfxClient", () => {
       },
     });
     await client.getJob("job_mock_0001");
-    assert.equal(calls, 1);
+    assert.equal(calls, 2, "health bootstrap and business request are both guarded");
+  });
+
+  it("single-flights session bootstrap and attaches the cached token to every business request", async () => {
+    let healthCalls = 0;
+    let businessCalls = 0;
+    let releaseHealth;
+    const healthGate = new Promise((resolve) => {
+      releaseHealth = resolve;
+    });
+    const fetchImpl = async (url, init = {}) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === "/healthz") {
+        healthCalls += 1;
+        await healthGate;
+        return textResponse(200, JSON.stringify(validHealthResponse()));
+      }
+      businessCalls += 1;
+      assert.equal(
+        new Headers(init.headers).get("X-CineVFX-Session"),
+        TEST_SESSION_TOKEN,
+      );
+      return textResponse(200, JSON.stringify(validJobStatus()));
+    };
+    const client = createCinevfxClient({ fetchImpl });
+
+    const first = client.getJob("job_mock_0001");
+    const second = client.getJob("job_mock_0001");
+    await new Promise((resolve) => setImmediate(resolve));
+    try {
+      assert.equal(healthCalls, 1);
+    } finally {
+      releaseHealth();
+    }
+    await Promise.all([first, second]);
+    await client.getJob("job_mock_0001");
+    assert.equal(healthCalls, 1);
+    assert.equal(businessCalls, 3);
+    assert.equal(JSON.stringify(client).includes(TEST_SESSION_TOKEN), false);
+  });
+
+  it("keeps a shared bootstrap alive for remaining callers when one is aborted", async () => {
+    let healthCalls = 0;
+    let bootstrapSignal;
+    let releaseHealth;
+    const healthGate = new Promise((resolve) => {
+      releaseHealth = resolve;
+    });
+    const fetchImpl = async (url, init = {}) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === "/healthz") {
+        healthCalls += 1;
+        bootstrapSignal = init.signal;
+        await healthGate;
+        return textResponse(200, JSON.stringify(validHealthResponse()));
+      }
+      return textResponse(200, JSON.stringify(validJobStatus()));
+    };
+    const client = createCinevfxClient({ fetchImpl });
+    const controller = new AbortController();
+    const cancelled = client.getJob("job_mock_0001", {
+      signal: controller.signal,
+    });
+    const remaining = client.getJob("job_mock_0001");
+    await new Promise((resolve) => setImmediate(resolve));
+    controller.abort();
+    await assert.rejects(
+      cancelled,
+      (error) => error instanceof CinevfxApiError && error.code === "aborted",
+    );
+    assert.equal(bootstrapSignal.aborted, false);
+    releaseHealth();
+    const status = await remaining;
+    assert.equal(status.jobId, "job_mock_0001");
+    assert.equal(healthCalls, 1);
+  });
+
+  it("clears a failed bootstrap so a later business call can retry", async () => {
+    let healthCalls = 0;
+    let businessCalls = 0;
+    const fetchImpl = async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === "/healthz") {
+        healthCalls += 1;
+        if (healthCalls === 1) {
+          return textResponse(503, JSON.stringify({ unavailable: true }));
+        }
+        return textResponse(200, JSON.stringify(validHealthResponse()));
+      }
+      businessCalls += 1;
+      return textResponse(200, JSON.stringify(validJobStatus()));
+    };
+    const client = createCinevfxClient({ fetchImpl });
+    await assert.rejects(
+      client.getJob("job_mock_0001"),
+      (error) =>
+        error instanceof CinevfxApiError &&
+        error.code === "session_bootstrap_failed" &&
+        error.status === 503,
+    );
+    const status = await client.getJob("job_mock_0001");
+    assert.equal(status.state, "RENDERING");
+    assert.equal(healthCalls, 2);
+    assert.equal(businessCalls, 1);
+  });
+
+  it("strictly validates and bounds the session bootstrap response", async () => {
+    const invalidResponses = [
+      validHealthResponse({ extra: true }),
+      validHealthResponse({ ok: false }),
+      validHealthResponse({ service: "foreign-service" }),
+      validHealthResponse({ sessionToken: "too_short" }),
+      validHealthResponse({ sessionToken: "x".repeat(129) }),
+    ];
+    for (const body of invalidResponses) {
+      let businessCalls = 0;
+      const client = createCinevfxClient({
+        fetchImpl: async (url) => {
+          if (new URL(url).pathname === "/healthz") {
+            return textResponse(200, JSON.stringify(body));
+          }
+          businessCalls += 1;
+          return textResponse(200, JSON.stringify(validJobStatus()));
+        },
+      });
+      await assert.rejects(
+        client.getJob("job_mock_0001"),
+        (error) =>
+          error instanceof CinevfxApiError && error.code === "invalid_response",
+      );
+      assert.equal(businessCalls, 0);
+    }
+
+    const oversized = createCinevfxClient({
+      fetchImpl: async () =>
+        textResponse(200, JSON.stringify({ padding: "x".repeat(5_000) })),
+    });
+    await assert.rejects(
+      oversized.getJob("job_mock_0001"),
+      (error) =>
+        error instanceof CinevfxApiError && error.code === "response_too_large",
+    );
   });
 
   it("surfaces HTTP errors as CinevfxApiError", async () => {
@@ -550,16 +694,73 @@ describe("createCinevfxClient", () => {
       fetchImpl: createMockFetch({
         "GET /v1/jobs/job_missing": () => ({
           status: 500,
-          body: { code: "aborted", message: "must not impersonate local abort" },
+          body: {
+            code: "aborted",
+            message: "must not impersonate local abort",
+            foreign_field: "must be rejected by validation",
+          },
         }),
       }),
     });
     await assert.rejects(
       () => malformedClient.getJob("job_missing"),
-      (error) =>
-        error instanceof CinevfxApiError &&
-        error.code === "invalid_response",
+      (error) => {
+        assert.ok(error instanceof CinevfxApiError);
+        assert.equal(error.code, "invalid_response");
+        return true;
+      },
     );
+
+    const echoedSessionToken = "A".repeat(32);
+    const escapedEcho = "\\u0041".repeat(32);
+    const echoedResponses = [
+      JSON.stringify({
+        code: echoedSessionToken,
+        message: `remote echoed ${echoedSessionToken}`,
+        retriable: true,
+      }),
+      `{"code":"${escapedEcho}","message":"escaped echo","retriable":true}`,
+      `"${escapedEcho}`,
+    ];
+    const echoClient = createCinevfxClient({
+      fetchImpl: async (url, init = {}) => {
+        if (String(url).endsWith("/healthz")) {
+          return textResponse(
+            200,
+            JSON.stringify(validHealthResponse({
+              sessionToken: echoedSessionToken,
+            })),
+            { "content-type": "application/json" },
+          );
+        }
+        assert.equal(
+          init.headers["X-CineVFX-Session"],
+          echoedSessionToken,
+        );
+        return textResponse(
+          500,
+          echoedResponses.shift(),
+          { "content-type": "application/json" },
+        );
+      },
+    });
+    for (let index = 0; index < 3; index += 1) {
+      await assert.rejects(
+        () => echoClient.getJob("job_missing"),
+        (error) => {
+          assert.ok(error instanceof CinevfxApiError);
+          assert.equal(error.code, "invalid_response");
+          const exposed = JSON.stringify({
+            message: error.message,
+            code: error.code,
+            body: error.body,
+          });
+          assert.equal(exposed.includes(echoedSessionToken), false);
+          assert.equal(exposed.includes(escapedEcho), false);
+          return true;
+        },
+      );
+    }
   });
 
   it("redacts successful status text and transport failures", async () => {
@@ -656,6 +857,36 @@ describe("createCinevfxClient", () => {
         return true;
       },
     );
+
+    const sessionToken = `${"A".repeat(31)}-`;
+    const leakedMessages = [
+      JSON.stringify({ headers: [["X-CineVFX-Session", sessionToken]] }),
+      `transport rejected credential ${sessionToken}`,
+    ];
+    const sessionFailureClient = createCinevfxClient({
+      fetchImpl: async (url, init = {}) => {
+        if (String(url).endsWith("/healthz")) {
+          return textResponse(
+            200,
+            JSON.stringify(validHealthResponse({ sessionToken })),
+            { "content-type": "application/json" },
+          );
+        }
+        assert.equal(init.headers["X-CineVFX-Session"], sessionToken);
+        throw new Error(leakedMessages.shift());
+      },
+    });
+    for (let index = 0; index < 2; index += 1) {
+      await assert.rejects(
+        () => sessionFailureClient.getJob("job_mock_0001"),
+        (error) => {
+          assert.ok(error instanceof CinevfxApiError);
+          assert.equal(error.code, "network_error");
+          assert.equal(error.message.includes(sessionToken), false);
+          return true;
+        },
+      );
+    }
   });
 
   it("rejects malformed or foreign asset and job success responses", async () => {
@@ -902,7 +1133,9 @@ describe("createCinevfxClient", () => {
 
   it("rejects malformed JSON on successful responses", async () => {
     const client = createCinevfxClient({
-      fetchImpl: async () => textResponse(200, "{not-json"),
+      fetchImpl: withSessionBootstrap(async () =>
+        textResponse(200, "{not-json"),
+      ),
     });
     await assert.rejects(
       () => client.getJob("job_mock_0001"),

@@ -10,6 +10,7 @@ Executable sources of truth:
 | Valid examples | `packages/contracts/examples/valid/` |
 | Invalid examples | `packages/contracts/examples/invalid/` |
 | OpenAPI | `openapi/openapi.json` |
+| Local development transport | `openapi/local-development-transport.json` |
 | Generated types | `packages/contracts/generated/types.d.ts` |
 | Runtime helpers | `packages/contracts/src/` |
 
@@ -44,6 +45,14 @@ OpenAPI covers exactly these six endpoints:
 - `GET /v1/jobs/{id}/events`
 - `POST /v1/jobs/{id}/cancel`
 - `GET /v1/jobs/{id}/manifest`
+
+The OpenAPI document remains the business endpoint and JSON-model baseline.
+The loopback-only development transport adds a bounded `GET /healthz` session
+bootstrap, `X-CineVFX-Session`, TLS/host rules, and transport-level response
+statuses without changing the frozen business JSON schemas. Its executable
+authority is `openapi/local-development-transport.json`. Each route separates
+success and error statuses and binds every HTTP error body to the OpenAPI
+`ErrorObject`; connection-only failures are listed separately.
 
 ## Validation
 

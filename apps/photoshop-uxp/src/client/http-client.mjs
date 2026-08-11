@@ -1,5 +1,6 @@
 /**
- * Public typed HTTP client for the six frozen Mock API endpoints.
+ * Public typed HTTP client for the six frozen Mock API endpoints, with an
+ * internal same-origin health/session bootstrap before business traffic.
  * Metadata-only: validates contract shapes, rejects sensitive fields,
  * and bounds request sizes before network dispatch.
  */
@@ -30,6 +31,9 @@ import {
 /** Default per-request network timeout (ms). Cancel/AbortSignal can end sooner. */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 256 * 1024;
+const MAX_HEALTH_RESPONSE_BYTES = 4 * 1024;
+const SESSION_HEADER = "X-CineVFX-Session";
+const SESSION_TOKEN_RE = /^[A-Za-z0-9_-]{32,128}$/;
 const FROZEN_EVENT_ID_RE = /^evt_[a-z0-9_]{1,58}$/;
 
 /**
@@ -76,6 +80,150 @@ export function createCinevfxClient(options = {}) {
   const configuredResponseLimit =
     /** @type {{ maxResponseBytes?: unknown }} */ (options).maxResponseBytes;
   const maxResponseBytes = normalizeResponseLimit(configuredResponseLimit);
+  /** @type {string | null} */
+  let sessionToken = null;
+  /** @type {{
+   *   controller: AbortController,
+   *   promise: Promise<string>,
+   *   waiters: number,
+   *   settled: boolean,
+   * } | null} */
+  let sessionBootstrap = null;
+
+  /**
+   * Bootstrap the local server session without exposing the token through the
+   * public client. The response is deliberately much smaller than business
+   * responses and is validated as one exact data shape.
+   * @param {AbortSignal} bootstrapSignal
+   */
+  async function fetchSessionToken(bootstrapSignal) {
+    const { signal, cleanup } = combineAbortSignals(
+      bootstrapSignal,
+      defaultTimeoutMs,
+    );
+    let response;
+    try {
+      onBeforeNetwork();
+      if (signal?.aborted) throw abortApiError(signal);
+      response = await fetchImpl(`${baseUrl}/healthz`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal,
+      });
+      const text = await readResponseTextBounded(
+        response,
+        Math.min(maxResponseBytes, MAX_HEALTH_RESPONSE_BYTES),
+      );
+      if (response.status !== 200) {
+        throw new CinevfxApiError("session bootstrap failed", {
+          status: response.status,
+          code: "session_bootstrap_failed",
+        });
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new CinevfxApiError("invalid session bootstrap response", {
+          status: response.status,
+          code: "invalid_response",
+        });
+      }
+      if (!isValidHealthResponse(parsed)) {
+        throw new CinevfxApiError("invalid session bootstrap response", {
+          status: response.status,
+          code: "invalid_response",
+        });
+      }
+      return parsed.sessionToken;
+    } catch (error) {
+      if (error instanceof CinevfxApiError) throw error;
+      if (signal?.aborted || isAbortError(error)) {
+        throw abortApiError(signal);
+      }
+      if (error instanceof ResponseTooLargeError) {
+        throw new CinevfxApiError("session bootstrap response is too large", {
+          status: response?.status ?? 0,
+          code: "response_too_large",
+        });
+      }
+      if (response) {
+        throw new CinevfxApiError("failed to read session bootstrap response", {
+          status: response.status,
+          code: "response_read_error",
+        });
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new CinevfxApiError(
+        `session bootstrap network error: ${redactBoundedText(message, 480)}`,
+        { status: 0, code: "network_error" },
+      );
+    } finally {
+      cleanup();
+    }
+  }
+
+  function startSessionBootstrap() {
+    if (sessionBootstrap) return sessionBootstrap;
+    const state = {
+      controller: new AbortController(),
+      /** @type {Promise<string>} */ promise: Promise.resolve(""),
+      waiters: 0,
+      settled: false,
+    };
+    state.promise = fetchSessionToken(state.controller.signal)
+      .then((token) => {
+        sessionToken = token;
+        return token;
+      })
+      .finally(() => {
+        state.settled = true;
+        if (sessionBootstrap === state) sessionBootstrap = null;
+      });
+    sessionBootstrap = state;
+    return state;
+  }
+
+  /**
+   * Share one health request across concurrent callers. A cancelled caller
+   * stops waiting immediately; the bootstrap is aborted only when no caller
+   * remains, so one cancellation cannot fail unrelated requests.
+   * @param {AbortSignal | undefined} signal
+   */
+  async function acquireSessionToken(signal) {
+    if (sessionToken !== null) return sessionToken;
+    const bootstrap = startSessionBootstrap();
+    bootstrap.waiters += 1;
+    try {
+      if (!signal) return await bootstrap.promise;
+      if (signal.aborted) throw abortApiError(signal);
+      return await new Promise((resolve, reject) => {
+        let done = false;
+        const settle = (callback, value) => {
+          if (done) return;
+          done = true;
+          signal.removeEventListener?.("abort", onAbort);
+          callback(value);
+        };
+        const onAbort = () => settle(reject, abortApiError(signal));
+        signal.addEventListener?.("abort", onAbort, { once: true });
+        bootstrap.promise.then(
+          (token) => settle(resolve, token),
+          (error) => settle(reject, error),
+        );
+      });
+    } finally {
+      bootstrap.waiters -= 1;
+      if (
+        signal?.aborted &&
+        bootstrap.waiters === 0 &&
+        !bootstrap.settled
+      ) {
+        if (sessionBootstrap === bootstrap) sessionBootstrap = null;
+        bootstrap.controller.abort(signal.reason ?? "aborted");
+      }
+    }
+  }
 
   /**
    * @param {string} method
@@ -118,11 +266,14 @@ export function createCinevfxClient(options = {}) {
 
     let response;
     try {
+      const token = await acquireSessionToken(signal);
+      headers[SESSION_HEADER] = token;
       onBeforeNetwork();
       if (signal?.aborted) throw abortApiError(signal);
       response = await fetchImpl(url, requestInit);
     } catch (err) {
       cleanup();
+      if (err instanceof CinevfxApiError) throw err;
       if (isAbortError(err) || signal?.aborted) {
         const reason = signal?.reason;
         const timedOut =
@@ -140,7 +291,7 @@ export function createCinevfxClient(options = {}) {
       }
       const message = err instanceof Error ? err.message : String(err);
       throw new CinevfxApiError(
-        `network error: ${redactBoundedText(message, 480)}`,
+        `network error: ${redactBoundedText(message, 480, sessionToken)}`,
         {
         status: 0,
         code: "network_error",
@@ -176,6 +327,13 @@ export function createCinevfxClient(options = {}) {
       cleanup();
     }
 
+    if (sessionToken !== null && text.includes(sessionToken)) {
+      throw new CinevfxApiError("response contained local session credential", {
+        status: response.status,
+        code: "invalid_response",
+      });
+    }
+
     const okStatuses = init.okStatuses ?? [200];
     let parsed = null;
     if (text) {
@@ -188,23 +346,39 @@ export function createCinevfxClient(options = {}) {
             code: "invalid_response_json",
           });
         }
-        parsed = { raw: text.slice(0, 200) };
+        // Never expose fragments of malformed error JSON. Even an apparently
+        // harmless escaped fragment can be a reversible representation of a
+        // session credential.
+        parsed = null;
       }
+    }
+
+    if (
+      sessionToken !== null &&
+      graphContainsExactSecret(parsed, sessionToken)
+    ) {
+      throw new CinevfxApiError("response contained local session credential", {
+        status: response.status,
+        code: "invalid_response",
+      });
     }
 
     if (!okStatuses.includes(response.status)) {
       const errors = [];
       validateErrorObject(parsed, "#", errors);
-      const safeBody = redactValue(parsed);
+      const safeBody = scrubExactSecretGraph(redactValue(parsed), sessionToken);
       if (errors.length > 0) {
         throw new CinevfxApiError("invalid error response", {
           status: response.status,
-          body: { errors: errors.slice(0, 32), response: safeBody },
+          body: scrubExactSecretGraph(
+            { errors: errors.slice(0, 32), response: safeBody },
+            sessionToken,
+          ),
           code: "invalid_response",
         });
       }
       const remote = /** @type {{ code: string, message: string }} */ (parsed);
-      throw new CinevfxApiError(redactBoundedText(remote.message, 512), {
+      throw new CinevfxApiError(redactBoundedText(remote.message, 512, sessionToken), {
         status: response.status,
         body: safeBody,
         code: remote.code,
@@ -343,7 +517,7 @@ export function createCinevfxClient(options = {}) {
       });
       return {
         ...response,
-        body: redactJobStatusText(response.body),
+        body: redactJobStatusText(response.body, sessionToken),
       };
     },
 
@@ -369,7 +543,7 @@ export function createCinevfxClient(options = {}) {
         jobId,
         idempotencyKey: options.expectedIdempotencyKey,
       });
-      return /** @type {JobStatus} */ (redactJobStatusText(body));
+      return /** @type {JobStatus} */ (redactJobStatusText(body, sessionToken));
     },
 
     /**
@@ -398,7 +572,7 @@ export function createCinevfxClient(options = {}) {
         { signal: options.signal, timeoutMs: options.timeoutMs },
       );
       assertValidJobEventsResponse(body, jobId, after, 200);
-      return /** @type {JobEventsResponse} */ (redactJobEventsText(body));
+      return /** @type {JobEventsResponse} */ (redactJobEventsText(body, sessionToken));
     },
 
     /**
@@ -427,7 +601,7 @@ export function createCinevfxClient(options = {}) {
         jobId,
         idempotencyKey: options.expectedIdempotencyKey,
       });
-      return /** @type {JobStatus} */ (redactJobStatusText(body));
+      return /** @type {JobStatus} */ (redactJobStatusText(body, sessionToken));
     },
 
     /**
@@ -449,6 +623,27 @@ export function createCinevfxClient(options = {}) {
 }
 
 class ResponseTooLargeError extends Error {}
+
+/** @param {unknown} value */
+function isValidHealthResponse(value) {
+  if (!isRecord(value)) return false;
+  const response = /** @type {Record<string, unknown>} */ (value);
+  const keys = Object.keys(response).sort();
+  if (
+    keys.length !== 3 ||
+    keys[0] !== "ok" ||
+    keys[1] !== "service" ||
+    keys[2] !== "sessionToken"
+  ) {
+    return false;
+  }
+  return (
+    response.ok === true &&
+    response.service === "cinevfx-mock-api" &&
+    typeof response.sessionToken === "string" &&
+    SESSION_TOKEN_RE.test(response.sessionToken)
+  );
+}
 
 /**
  * @param {unknown} configured
@@ -1046,7 +1241,7 @@ function throwInvalidResponse(kind, status, errors) {
 }
 
 /** @param {unknown} body */
-function redactJobStatusText(body) {
+function redactJobStatusText(body, sessionToken) {
   const status = /** @type {Record<string, unknown>} */ (body);
   const safe = { ...status };
   if (isRecord(status.progress)) {
@@ -1054,10 +1249,10 @@ function redactJobStatusText(body) {
     safe.progress = {
       ...progress,
       ...(typeof progress.stage === "string"
-        ? { stage: redactBoundedText(progress.stage, 64) }
+        ? { stage: redactBoundedText(progress.stage, 64, sessionToken) }
         : {}),
       ...(typeof progress.message === "string"
-        ? { message: redactBoundedText(progress.message, 256) }
+        ? { message: redactBoundedText(progress.message, 256, sessionToken) }
         : {}),
     };
   }
@@ -1066,7 +1261,7 @@ function redactJobStatusText(body) {
     safe.error = {
       ...error,
       ...(typeof error.message === "string"
-        ? { message: redactBoundedText(error.message, 512) }
+        ? { message: redactBoundedText(error.message, 512, sessionToken) }
         : {}),
     };
   }
@@ -1074,7 +1269,7 @@ function redactJobStatusText(body) {
 }
 
 /** @param {unknown} body */
-function redactJobEventsText(body) {
+function redactJobEventsText(body, sessionToken) {
   const envelope = /** @type {Record<string, unknown>} */ (body);
   const events = /** @type {unknown[]} */ (envelope.events);
   const safeEvents = [];
@@ -1083,7 +1278,7 @@ function redactJobEventsText(body) {
     const safeEvent = {
       ...event,
       ...(typeof event.message === "string"
-        ? { message: redactBoundedText(event.message, 256) }
+        ? { message: redactBoundedText(event.message, 256, sessionToken) }
         : {}),
     };
     if (isRecord(event.progress)) {
@@ -1091,10 +1286,10 @@ function redactJobEventsText(body) {
       safeEvent.progress = {
         ...progress,
         ...(typeof progress.stage === "string"
-          ? { stage: redactBoundedText(progress.stage, 64) }
+          ? { stage: redactBoundedText(progress.stage, 64, sessionToken) }
           : {}),
         ...(typeof progress.message === "string"
-          ? { message: redactBoundedText(progress.message, 256) }
+          ? { message: redactBoundedText(progress.message, 256, sessionToken) }
           : {}),
       };
     }
@@ -1103,7 +1298,7 @@ function redactJobEventsText(body) {
       safeEvent.error = {
         ...error,
         ...(typeof error.message === "string"
-          ? { message: redactBoundedText(error.message, 512) }
+          ? { message: redactBoundedText(error.message, 512, sessionToken) }
           : {}),
       };
     }
@@ -1117,11 +1312,75 @@ function redactJobEventsText(body) {
  * @param {string} value
  * @param {number} maxLength
  */
-function redactBoundedText(value, maxLength) {
-  const safe = redactString(value);
+function redactBoundedText(value, maxLength, exactSecret = null) {
+  const withoutExactSecret =
+    typeof exactSecret === "string" && exactSecret.length > 0
+      ? value.split(exactSecret).join("[redacted-session]")
+      : value;
+  const safe = redactString(withoutExactSecret);
   if (safe.length <= maxLength) return safe;
   if (maxLength <= 3) return safe.slice(0, maxLength);
   return `${safe.slice(0, maxLength - 3)}...`;
+}
+
+/**
+ * Remove the exact closure-owned session value from an already bounded,
+ * redacted public error graph without guessing at unrelated long strings.
+ * @param {unknown} value
+ * @param {string | null} exactSecret
+ * @returns {unknown}
+ */
+function scrubExactSecretGraph(value, exactSecret) {
+  if (typeof exactSecret !== "string" || exactSecret.length === 0) return value;
+  if (typeof value === "string") {
+    return value.split(exactSecret).join("[redacted-session]");
+  }
+  if (Array.isArray(value)) {
+    const safe = new Array(value.length);
+    for (let index = 0; index < value.length; index += 1) {
+      safe[index] = scrubExactSecretGraph(value[index], exactSecret);
+    }
+    return safe;
+  }
+  if (value && typeof value === "object") {
+    /** @type {Record<string, unknown>} */
+    const safe = {};
+    for (const [key, child] of Object.entries(value)) {
+      const safeKey = key.split(exactSecret).join("[redacted-session]");
+      safe[safeKey] = scrubExactSecretGraph(child, exactSecret);
+    }
+    return safe;
+  }
+  return value;
+}
+
+/**
+ * Check parsed response keys and values as well as raw response text so JSON
+ * escapes cannot conceal a reflected session credential.
+ * @param {unknown} root
+ * @param {string} exactSecret
+ */
+function graphContainsExactSecret(root, exactSecret) {
+  const pending = [root];
+  while (pending.length > 0) {
+    const value = pending.pop();
+    if (typeof value === "string") {
+      if (value.includes(exactSecret)) return true;
+      continue;
+    }
+    if (!value || typeof value !== "object") continue;
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        pending.push(value[index]);
+      }
+      continue;
+    }
+    for (const [key, child] of Object.entries(value)) {
+      if (key.includes(exactSecret)) return true;
+      pending.push(child);
+    }
+  }
+  return false;
 }
 
 

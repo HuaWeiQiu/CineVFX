@@ -8,6 +8,8 @@ importers:
 
   .: {}
 
+  apps/api-server: {}
+
   apps/photoshop-uxp:
     devDependencies:
       typescript:

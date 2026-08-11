@@ -85,6 +85,30 @@ describe("log redaction", () => {
     assert.match(line, /job_mock_0001/);
   });
 
+  it("redacts the local session header in structured and free-text logs", () => {
+    for (const token of [
+      "test_session_token_0123456789abcdef",
+      `${"A".repeat(31)}-`,
+    ]) {
+      const structured = redactValue({
+        sessionToken: token,
+        headers: { "X-CineVFX-Session": [token] },
+      });
+      assert.equal(structured.sessionToken, "[redacted]");
+      assert.equal(structured.headers["X-CineVFX-Session"], "[redacted]");
+      for (const value of [
+        `X-CineVFX-Session: ${token}`,
+        JSON.stringify({ headers: { "X-CineVFX-Session": token } }),
+        JSON.stringify({ headers: { "X-CineVFX-Session": [token] } }),
+        JSON.stringify({ headers: [["X-CineVFX-Session", token]] }),
+      ]) {
+        const text = redactString(value);
+        assert.equal(text.includes(token), false);
+        assert.match(text, /X-CineVFX-Session: \[redacted\]/);
+      }
+    }
+  });
+
   it("redacts Basic auth and secrets embedded in URLs", () => {
     const redacted = redactString(
       "Basic dXNlcjpzdXBlcnNlY3JldA== https://alice:secret@example.com/render?token=abc123&quality=high&api_key=xyz&accessToken=camel-secret&client_secret=client-secret#done",

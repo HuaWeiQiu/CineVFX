@@ -1,0 +1,136 @@
+{
+  "documentType": "cinevfx-local-development-transport-contract",
+  "contractId": "cinevfx-local-development-transport",
+  "contractVersion": "1.0.0",
+  "scope": "single-user-loopback-development",
+  "canonicalOrigin": "https://localhost:8787",
+  "allowedOrigins": [
+    "https://localhost:8787",
+    "https://127.0.0.1:8787",
+    "http://localhost:8787",
+    "http://127.0.0.1:8787"
+  ],
+  "health": {
+    "method": "GET",
+    "path": "/healthz",
+    "successStatus": 200,
+    "maxResponseBytes": 4096,
+    "cacheControl": "no-store",
+    "requiredResponseFields": [
+      "ok",
+      "service",
+      "sessionToken"
+    ]
+  },
+  "session": {
+    "bootstrapPath": "/healthz",
+    "headerName": "X-CineVFX-Session",
+    "requiredPathPrefix": "/v1/",
+    "tokenPattern": "^[A-Za-z0-9_-]{32,128}$",
+    "exposure": "memory-only",
+    "corsEnabled": false
+  },
+  "network": {
+    "allowedBindHosts": [
+      "localhost",
+      "127.0.0.1"
+    ],
+    "cliPort": 8787,
+    "minimumTlsVersion": "TLSv1.2",
+    "defaultBodyTimeoutMs": 5000,
+    "defaultCloseGraceMs": 250,
+    "maxRequestBodyBytes": 262144
+  },
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/v1/assets",
+      "effectiveResponseStatuses": [
+        201,
+        400,
+        409,
+        413,
+        500
+      ],
+      "successResponseStatuses": [201],
+      "errorResponseStatuses": [400, 409, 413, 500],
+      "errorResponseSchema": "openapi.json#/components/schemas/ErrorObject"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/jobs",
+      "effectiveResponseStatuses": [
+        200,
+        201,
+        400,
+        409,
+        413,
+        500
+      ],
+      "successResponseStatuses": [200, 201],
+      "errorResponseStatuses": [400, 409, 413, 500],
+      "errorResponseSchema": "openapi.json#/components/schemas/ErrorObject"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/jobs/{id}",
+      "effectiveResponseStatuses": [
+        200,
+        400,
+        404,
+        500
+      ],
+      "successResponseStatuses": [200],
+      "errorResponseStatuses": [400, 404, 500],
+      "errorResponseSchema": "openapi.json#/components/schemas/ErrorObject"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/jobs/{id}/events",
+      "effectiveResponseStatuses": [
+        200,
+        400,
+        404,
+        500
+      ],
+      "successResponseStatuses": [200],
+      "errorResponseStatuses": [400, 404, 500],
+      "errorResponseSchema": "openapi.json#/components/schemas/ErrorObject"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/jobs/{id}/cancel",
+      "effectiveResponseStatuses": [
+        200,
+        400,
+        404,
+        409,
+        413,
+        500
+      ],
+      "successResponseStatuses": [200],
+      "errorResponseStatuses": [400, 404, 409, 413, 500],
+      "errorResponseSchema": "openapi.json#/components/schemas/ErrorObject"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/jobs/{id}/manifest",
+      "effectiveResponseStatuses": [
+        200,
+        400,
+        404,
+        409,
+        500
+      ],
+      "successResponseStatuses": [200],
+      "errorResponseStatuses": [400, 404, 409, 500],
+      "errorResponseSchema": "openapi.json#/components/schemas/ErrorObject"
+    }
+  ],
+  "connectionOnlyFailures": [
+    {
+      "code": "BODY_TIMEOUT",
+      "behavior": "close-without-state-change"
+    }
+  ]
+}

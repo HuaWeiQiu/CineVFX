@@ -12,9 +12,35 @@ export const DEFAULT_LIMITS = Object.freeze({
   maxBodyBytes: 256 * 1024,
 });
 
+const LIMIT_NAMES = Object.freeze(Object.keys(DEFAULT_LIMITS));
+
+function normalizeLimits(limits) {
+  if (!limits || typeof limits !== "object" || Array.isArray(limits)) {
+    throw new TypeError("limits must be an object");
+  }
+  for (const key of Object.keys(limits)) {
+    if (!LIMIT_NAMES.includes(key)) {
+      throw new TypeError(`unknown resource limit ${key}`);
+    }
+  }
+  const resolved = { ...DEFAULT_LIMITS, ...limits };
+  for (const name of LIMIT_NAMES) {
+    if (
+      !Number.isSafeInteger(resolved[name]) ||
+      resolved[name] < 1 ||
+      resolved[name] > DEFAULT_LIMITS[name]
+    ) {
+      throw new TypeError(
+        `${name} must be a positive safe integer no greater than ${DEFAULT_LIMITS[name]}`,
+      );
+    }
+  }
+  return resolved;
+}
+
 export function createStore(limits = DEFAULT_LIMITS) {
   return {
-    limits: { ...DEFAULT_LIMITS, ...limits },
+    limits: Object.freeze(normalizeLimits(limits)),
     assetsById: new Map(),
     jobsById: new Map(),
     jobsByIdempotencyKey: new Map(),

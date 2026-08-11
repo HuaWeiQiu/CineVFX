@@ -7,8 +7,8 @@
   },
   "servers": [
     {
-      "url": "http://127.0.0.1:8787",
-      "description": "Local Mock API"
+      "url": "https://localhost:8787",
+      "description": "Canonical local Mock API; see local-development-transport.json"
     }
   ],
   "tags": [

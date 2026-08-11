@@ -1,5 +1,7 @@
 /** Shared fixtures for UXP shell tests (metadata only, no image bytes). */
 
+export const TEST_SESSION_TOKEN = "test_session_token_0123456789abcdef";
+
 export function digest(hexChar) {
   return `sha256:${String(hexChar).repeat(64)}`;
 }
@@ -236,6 +238,9 @@ export function createMockFetch(routes) {
     const method = (init.method ?? "GET").toUpperCase();
     const u = new URL(url, "http://127.0.0.1:8787");
     const key = `${method} ${u.pathname}`;
+    if (key === "GET /healthz" && !routes[key]) {
+      return jsonResponse(200, validHealthResponse());
+    }
     const handler = routes[key] ?? routes["*"];
     if (!handler) {
       return jsonResponse(404, {
@@ -247,10 +252,16 @@ export function createMockFetch(routes) {
     if (init.body) {
       body = JSON.parse(String(init.body));
     }
+    const headers = new Headers(init.headers ?? {});
+    if (u.pathname.startsWith("/v1/")) {
+      if (headers.get("X-CineVFX-Session") !== TEST_SESSION_TOKEN) {
+        throw new Error("business request missing the bootstrapped session token");
+      }
+    }
     const result = handler({
       method,
       url: u,
-      headers: new Headers(init.headers ?? {}),
+      headers,
       body,
       signal: init.signal,
     });
@@ -260,6 +271,30 @@ export function createMockFetch(routes) {
       return hangUntilAbort(init.signal);
     }
     return jsonResponse(resolved.status, resolved.body);
+  };
+}
+
+export function validHealthResponse(overrides = {}) {
+  return {
+    ok: true,
+    service: "cinevfx-mock-api",
+    sessionToken: TEST_SESSION_TOKEN,
+    ...overrides,
+  };
+}
+
+/** Add the real client bootstrap exchange in front of a focused fetch stub. */
+export function withSessionBootstrap(fetchImpl, healthResponse = validHealthResponse()) {
+  return async (url, init = {}) => {
+    const parsed = new URL(url, "http://127.0.0.1:8787");
+    if ((init.method ?? "GET").toUpperCase() === "GET" && parsed.pathname === "/healthz") {
+      return jsonResponse(200, healthResponse);
+    }
+    const headers = new Headers(init.headers ?? {});
+    if (headers.get("X-CineVFX-Session") !== TEST_SESSION_TOKEN) {
+      throw new Error("business request missing the bootstrapped session token");
+    }
+    return fetchImpl(url, init);
   };
 }
 

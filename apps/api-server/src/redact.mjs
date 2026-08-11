@@ -8,12 +8,24 @@
  * Covers camelCase, snake_case, and common credential aliases.
  */
 const SENSITIVE_KEY_PATTERN =
-  /^(prompt|password|passwd|passphrase|api[_-]?key|authorization|auth|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|client[_-]?id|private[_-]?key|secret|credential|credentials|cookie|set[_-]?cookie|session|session[_-]?id|token|bearer|content|image[_-]?bytes|pixels|raw[_-]?bytes|local[_-]?path|file[_-]?path|absolute[_-]?path|source[_-]?path|upload[_-]?path|effect[_-]?label|label|user[_-]?content|protected[_-]?content)$/i;
+  /^(prompt|password|passwd|passphrase|api[_-]?key|authorization|auth|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|client[_-]?id|private[_-]?key|secret|credential|credentials|cookie|set[_-]?cookie|session|session[_-]?(?:id|token)|token|bearer|content|image[_-]?bytes|pixels|raw[_-]?bytes|local[_-]?path|file[_-]?path|absolute[_-]?path|source[_-]?path|upload[_-]?path|effect[_-]?label|label|user[_-]?content|protected[_-]?content)$/i;
 
 const SENSITIVE_VALUE_PATTERNS = [
   { name: "data-url-image", regex: /data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi },
   { name: "bearer-token", regex: /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi },
+  {
+    name: "session-token",
+    regex:
+      /\bX-CineVFX-Session["']?\s*(?::|=>?|,)\s*(?:\[\s*)?["']?[A-Za-z0-9_-]{32,128}(?![A-Za-z0-9_-])["']?(?:\s*\])?/gi,
+  },
 ];
+
+function isSensitiveKey(key) {
+  if (/^x-cinevfx-session$/i.test(key)) return true;
+  if (SENSITIVE_KEY_PATTERN.test(key)) return true;
+  const normalized = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2");
+  return SENSITIVE_KEY_PATTERN.test(normalized);
+}
 
 function absolutePathKind(value) {
   if (/file:\/\/\//i.test(value)) return "absolute-file-uri-path";
@@ -67,7 +79,7 @@ export function redactForLog(value, depth = 0) {
   if (typeof value === "object") {
     const out = {};
     for (const [key, nested] of Object.entries(value)) {
-      if (SENSITIVE_KEY_PATTERN.test(key)) {
+      if (isSensitiveKey(key)) {
         out[key] = "[REDACTED]";
         continue;
       }

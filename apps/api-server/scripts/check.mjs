@@ -53,6 +53,76 @@ async function main() {
   const contractsPkg = path.join(repoRoot, "packages/contracts/package.json");
   await access(contractsPkg);
 
+  const transportContract = JSON.parse(
+    await readFile(
+      path.join(repoRoot, "openapi/local-development-transport.json"),
+      "utf8",
+    ),
+  );
+  assert(
+    transportContract.documentType ===
+        "cinevfx-local-development-transport-contract" &&
+      transportContract.contractId === "cinevfx-local-development-transport" &&
+      transportContract.contractVersion === "1.0.0",
+    "local transport contract identity must remain frozen",
+  );
+  assert(
+    transportContract.canonicalOrigin === "https://localhost:8787" &&
+      transportContract.health?.path === "/healthz" &&
+      transportContract.health?.maxResponseBytes === 4096 &&
+      transportContract.session?.headerName === "X-CineVFX-Session" &&
+      transportContract.session?.corsEnabled === false &&
+      transportContract.network?.cliPort === 8787 &&
+      transportContract.network?.minimumTlsVersion === "TLSv1.2" &&
+      transportContract.network?.defaultBodyTimeoutMs === 5000 &&
+      transportContract.network?.defaultCloseGraceMs === 250 &&
+      transportContract.network?.maxRequestBodyBytes === 262144,
+    "local transport contract does not match runtime defaults",
+  );
+  const openapi = JSON.parse(
+    await readFile(path.join(repoRoot, "openapi/openapi.json"), "utf8"),
+  );
+  assert(
+    openapi.servers?.length === 1 &&
+      openapi.servers[0]?.url === transportContract.canonicalOrigin,
+    "OpenAPI server must match the canonical local transport origin",
+  );
+  const expectedTransportRoutes = [
+    ["POST", "/v1/assets", "201", "400,409,413,500"],
+    ["POST", "/v1/jobs", "200,201", "400,409,413,500"],
+    ["GET", "/v1/jobs/{id}", "200", "400,404,500"],
+    ["GET", "/v1/jobs/{id}/events", "200", "400,404,500"],
+    ["POST", "/v1/jobs/{id}/cancel", "200", "400,404,409,413,500"],
+    ["GET", "/v1/jobs/{id}/manifest", "200", "400,404,409,500"],
+  ];
+  assert(
+    JSON.stringify(
+      transportContract.routes?.map((route) => [
+        route.method,
+        route.path,
+        route.successResponseStatuses.join(","),
+        route.errorResponseStatuses.join(","),
+      ]),
+    ) === JSON.stringify(expectedTransportRoutes),
+    "local transport route/status surface drifted",
+  );
+  for (const route of transportContract.routes) {
+    const effectiveStatuses = [
+      ...route.successResponseStatuses,
+      ...route.errorResponseStatuses,
+    ].sort((left, right) => left - right);
+    assert(
+      JSON.stringify(effectiveStatuses) ===
+        JSON.stringify([...route.effectiveResponseStatuses].sort((left, right) => left - right)),
+      `effective statuses must equal success plus error statuses for ${route.method} ${route.path}`,
+    );
+    assert(
+      route.errorResponseSchema ===
+        "openapi.json#/components/schemas/ErrorObject",
+      `error responses must use ErrorObject for ${route.method} ${route.path}`,
+    );
+  }
+
   // Syntax/load check of public entrypoints.
   const indexUrl = pathToFileURL(path.join(packageRoot, "src/index.mjs")).href;
   const mod = await import(indexUrl);
@@ -71,6 +141,10 @@ async function main() {
 
   // Confirm six endpoints are documented in README.
   const readme = await readFile(path.join(packageRoot, "README.md"), "utf8");
+  assert(
+    readme.includes("openapi/local-development-transport.json"),
+    "README must name the local transport authority",
+  );
   for (const endpoint of [
     "POST /v1/assets",
     "POST /v1/jobs",

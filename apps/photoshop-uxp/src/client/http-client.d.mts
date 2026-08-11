@@ -437,6 +437,10 @@ export interface ApiError extends Error {
 }
 
 export interface CinevfxHttpClient {
+  /**
+   * Allowed loopback origin. The client internally bootstraps and caches a
+   * same-origin session token before its first business request.
+   */
   readonly baseUrl: string;
   createAsset(
     descriptor: AssetDescriptor,
@@ -467,7 +471,10 @@ export interface JobStatusCallOptions extends CallOptions {
 export interface CreateClientOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
-  /** Optional hook invoked before each network call (must not run inside modal). */
+  /**
+   * Optional hook invoked before each network call, including the one-time
+   * session bootstrap (must not run inside modal).
+   */
   onBeforeNetwork?: () => void;
   /** Default per-request timeout in milliseconds (default 15000). */
   timeoutMs?: number;

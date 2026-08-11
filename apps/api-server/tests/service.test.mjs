@@ -6,6 +6,7 @@ import {
   validateManifestSemantics,
 } from "../../../packages/contracts/src/index.mjs";
 import { createMockApi } from "../src/service.mjs";
+import { createStore } from "../src/store.mjs";
 import {
   digest,
   loadValidExample,
@@ -23,6 +24,50 @@ function createApi(overrides = {}) {
   });
   return { api, lines };
 }
+
+test("store rejects invalid or unknown resource limits", () => {
+  for (const name of [
+    "maxAssets",
+    "maxJobs",
+    "maxEventsPerJob",
+    "maxBodyBytes",
+  ]) {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, 0, -1, 1.5]) {
+      assert.throws(
+        () => createStore({ [name]: value }),
+        new RegExp(`${name} must be a positive safe integer`),
+      );
+    }
+    assert.throws(
+      () => createStore({ [name]: Number.MAX_SAFE_INTEGER }),
+      new RegExp(`${name} must be a positive safe integer no greater than`),
+    );
+  }
+  assert.throws(() => createStore(null), /limits must be an object/);
+  assert.throws(
+    () => createStore({ maxJobs: 1, unexpected: 2 }),
+    /unknown resource limit unexpected/,
+  );
+
+  const store = createStore({
+    maxAssets: 1,
+    maxJobs: 1,
+    maxEventsPerJob: 1,
+    maxBodyBytes: 1,
+  });
+  assert.equal(Object.isFrozen(store.limits), true);
+  for (const name of [
+    "maxAssets",
+    "maxJobs",
+    "maxEventsPerJob",
+    "maxBodyBytes",
+  ]) {
+    assert.throws(() => {
+      store.limits[name] = Number.MAX_SAFE_INTEGER;
+    }, TypeError);
+    assert.equal(store.limits[name], 1);
+  }
+});
 
 test("registers assets and rejects digest conflicts", async () => {
   const { api } = createApi();
@@ -323,10 +368,15 @@ test("cancellation capacity failure leaves the live job completely unchanged", a
     before,
   );
 
-  api.store.limits.maxEventsPerJob = 8;
-  const cancelled = api.cancelJob(jobId);
+  const { api: permissiveApi } = createApi({ limits: { maxEventsPerJob: 8 } });
+  await registerDefaultAssets(permissiveApi);
+  const permissiveCreated = await permissiveApi.createJob(
+    request,
+    request.idempotencyKey,
+  );
+  const cancelled = permissiveApi.cancelJob(permissiveCreated.body.jobId);
   assert.equal(cancelled.body.state, "CANCELLED");
-  const events = api.getJobEvents(jobId).body.events;
+  const events = permissiveApi.getJobEvents(permissiveCreated.body.jobId).body.events;
   assert.deepEqual(events.map((event) => event.sequence), events.map((_, index) => index));
 });
 
@@ -431,6 +481,9 @@ test("unknown job returns 404", async () => {
 
 test("resource limits are enforced", async () => {
   const { api } = createApi({ limits: { maxAssets: 1, maxJobs: 1 } });
+  assert.throws(() => {
+    api.store.limits.maxAssets = 257;
+  }, TypeError);
   const first = makeAsset({
     assetId: "asset_proxy_source_01",
     digest: digest("1"),

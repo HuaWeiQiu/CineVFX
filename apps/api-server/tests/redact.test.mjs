@@ -10,6 +10,7 @@ test("redactForLog strips sensitive keys and path-like values", () => {
     apiKey: "abc",
     accessToken: "at-secret",
     refresh_token: "rt-secret",
+    sessionToken: "test_session_token_0123456789abcdef",
     clientSecret: "cs-secret",
     privateKey: "pk-secret",
     cookie: "session=abc",
@@ -36,6 +37,7 @@ test("redactForLog strips sensitive keys and path-like values", () => {
   assert.equal(redacted.apiKey, "[REDACTED]");
   assert.equal(redacted.accessToken, "[REDACTED]");
   assert.equal(redacted.refresh_token, "[REDACTED]");
+  assert.equal(redacted.sessionToken, "[REDACTED]");
   assert.equal(redacted.clientSecret, "[REDACTED]");
   assert.equal(redacted.privateKey, "[REDACTED]");
   assert.equal(redacted.cookie, "[REDACTED]");
@@ -107,6 +109,7 @@ test("logger emits JSON without sensitive values", () => {
     accessToken: "tok-xyz",
     volumesPath: "/Volumes/Drive/secret.psd",
     jobId: "job_mock_0001",
+    sessionToken: "test_session_token_0123456789abcdef",
   });
   assert.equal(lines.length, 1);
   const parsed = JSON.parse(lines[0]);
@@ -115,10 +118,36 @@ test("logger emits JSON without sensitive values", () => {
   assert.equal(parsed.fields.accessToken, "[REDACTED]");
   assert.match(parsed.fields.volumesPath, /REDACTED/);
   assert.equal(parsed.fields.jobId, "job_mock_0001");
+  assert.equal(parsed.fields.sessionToken, "[REDACTED]");
   assert.equal(lines[0].includes("hidden"), false);
   assert.equal(lines[0].includes("/home/user/private.png"), false);
   assert.equal(lines[0].includes("tok-xyz"), false);
   assert.equal(lines[0].includes("/Volumes/Drive/secret.psd"), false);
+  assert.equal(lines[0].includes("test_session_token_0123456789abcdef"), false);
+});
+
+test("logger redacts a session credential embedded in free text", () => {
+  for (const token of [
+    "test_session_token_0123456789abcdef",
+    `${"A".repeat(31)}-`,
+  ]) {
+    const structured = redactForLog({
+      headers: { "X-CineVFX-Session": [token] },
+    });
+    assert.equal(JSON.stringify(structured).includes(token), false);
+    assert.equal(structured.headers["X-CineVFX-Session"], "[REDACTED]");
+
+    for (const text of [
+      `X-CineVFX-Session: ${token}`,
+      JSON.stringify({ headers: { "X-CineVFX-Session": token } }),
+      JSON.stringify({ headers: { "X-CineVFX-Session": [token] } }),
+      JSON.stringify({ headers: [["X-CineVFX-Session", token]] }),
+    ]) {
+      const redacted = redactForLog(text);
+      assert.equal(redacted.includes(token), false);
+      assert.match(redacted, /REDACTED:session-token/);
+    }
+  }
 });
 
 test("logger redacts non-string message values", () => {
