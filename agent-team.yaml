@@ -41,7 +41,7 @@ profiles:
     reasoning: high
     permission: workspace-write
     externalTools: deny
-    maxTurns: 16
+    maxTurns: 32
     timeoutSeconds: 3600
 
   codex-reviewer:
@@ -114,7 +114,7 @@ strategies:
       topology:
         mode: parallel-dag
       maxParallel: 2
-      maxReworkAttempts: 1
+      maxReworkAttempts: 2
       executionTimeoutSeconds: 43200
       maxAgentInvocations: 64
       maxProcessOutputBytes: 1048576
