@@ -1,33 +1,79 @@
-version: 1
-phase: P0-P1
+version: 2
+phase: P0-P5
+lastUpdated: 2026-08-12
 tasks:
   - id: C00
+    stage: 1
+    status: completed
     title: Freeze shared contracts and examples
     dependsOn: []
     ownedPaths:
       - packages/contracts/**
       - docs/contracts/**
       - openapi/**
-    exit: JSON Schema examples and OpenAPI validate deterministically
+    evidence:
+      - contracts tests 20/20
+      - contracts check and build passed
+    exit: JSON Schema examples, generated declarations, and OpenAPI validate deterministically
 
   - id: C01
-    title: Implement Mock job and asset API
+    stage: 2
+    status: completed
+    title: Implement bounded Mock job and asset API
     dependsOn: [C00]
     ownedPaths:
       - apps/api-server/**
-    exit: asset, job, event, cancel, and manifest tests pass
+    evidence:
+      - API tests 59/59
+      - API check and build passed
+    exit: asset, job, event, cancel, manifest, and local transport tests pass
 
   - id: C02
-    title: Implement Photoshop UXP shell and typed client
+    stage: 3
+    status: completed
+    title: Implement Photoshop UXP development shell and typed client
     dependsOn: [C00]
     ownedPaths:
       - apps/photoshop-uxp/**
-    exit: panel state, client, manifest validation, and import-plan tests pass
+    evidence:
+      - UXP Node tests 130/130
+      - project-pinned tsc, check, and build passed
+    exit: panel state, client, manifest validation, and proxy/import-plan tests pass
 
   - id: C03
-    title: Prove the Mock vertical slice
+    stage: 4
+    status: completed
+    title: Prove the Mock vertical slice over real Node sockets
     dependsOn: [C01, C02]
     ownedPaths:
       - tests/integration/**
-      - fixtures/**
-    exit: fixed proxy-to-manifest-to-import-plan flow passes with cancellation cases
+      - openapi/local-development-transport.json
+    evidence:
+      - root tests 6/6 including four real-socket integration tests
+      - authenticated health/session and six-route transport covered
+      - root check and build passed
+    exit: fixed proxy-metadata to manifest to import-plan flow and cancellation pass in Node
+
+  - id: C04
+    stage: 5
+    status: completed
+    title: Final development-preview delivery handoff
+    dependsOn: [C03]
+    ownedPaths:
+      - README.md
+      - PROJECT_STATE.md
+      - LICENSE
+      - docs/**
+    evidence:
+      - MIT license added
+      - deterministic ZIP, release manifest, and SHA-256 tooling covered by four tests
+      - current root suite 14/14
+      - certificate, Windows, and UDT instructions documented
+      - documentation links, facts, and working diff checked
+    exit: handoff states verified Node scope and all unverified Photoshop/release boundaries
+
+remainingGates:
+  - real Photoshop 2026 export/import and executeAsModal on macOS
+  - real Photoshop 2026 export/import and executeAsModal on Windows
+  - protected-source pixel and geometry comparison
+  - signed CCX and marketplace acceptance, if formal distribution is pursued

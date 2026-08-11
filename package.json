@@ -1,16 +1,21 @@
 {
   "name": "cinevfx",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Contract-first Photoshop VFX compositing system",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "check": "node scripts/check-project.mjs",
-    "test": "node --test tests/bootstrap.test.mjs tests/integration/uxp-api-network.test.mjs",
+    "check": "node scripts/run-all.mjs check",
+    "check:root": "node scripts/check-project.mjs",
+    "test": "node scripts/run-all.mjs test",
+    "test:root": "node --test tests/bootstrap.test.mjs tests/package-release.test.mjs tests/run-all.test.mjs tests/integration/uxp-api-network.test.mjs",
     "test:integration": "node --test tests/integration/uxp-api-network.test.mjs",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/run-all.mjs build",
+    "build:root": "node scripts/build.mjs",
+    "verify": "node scripts/run-all.mjs verify",
+    "release:dev": "node scripts/package-release.mjs"
   },
   "engines": {
     "node": ">=24"

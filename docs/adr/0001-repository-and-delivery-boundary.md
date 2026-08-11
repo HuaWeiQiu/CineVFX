@@ -4,6 +4,11 @@
 
 Accepted, 2026-08-12.
 
+Implementation note, 2026-08-12: the contract-first Mock vertical slice now
+passes in Node over real loopback sockets. Photoshop export/import,
+`executeAsModal`, certificate trust in UXP, and cross-platform host behavior
+remain unverified and are not implied by that result.
+
 ## Decision
 
 CineVFX is a new monorepo rather than a feature branch of GlowFX. GlowFX keeps

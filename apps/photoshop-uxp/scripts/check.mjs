@@ -35,6 +35,7 @@ const requiredFiles = [
   "src/ui/panel-workflow.mjs",
   "src/constants.mjs",
   "scripts/bundle-classic.mjs",
+  "scripts/plugin-artifact.mjs",
   "scripts/validate-uxp-manifest.mjs",
   "tsconfig.types.json",
   "tests/types/public-api.ts",
@@ -64,6 +65,9 @@ const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8"))
 const manifestErrors = validateUxpManifest(manifest);
 if (manifestErrors.length > 0) {
   throw new Error(`manifest is outside the strict UXP v5 subset: ${JSON.stringify(manifestErrors)}`);
+}
+if (manifest.version !== pkg.version) {
+  throw new Error("package.json and manifest.json versions must match");
 }
 
 const readme = await readFile(join(root, "README.md"), "utf8");

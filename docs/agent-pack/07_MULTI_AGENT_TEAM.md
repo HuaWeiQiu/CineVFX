@@ -2,32 +2,45 @@
 
 ## Roles
 
-- Orchestrator: scope, risk, final decision, and escalation.
-- Architect: dependency DAG, path ownership, and acceptance commands.
-- Worker: one bounded task in one isolated worktree.
+- Orchestrator: scope, path ownership, risk, final decision, and integration.
+- Architect: dependency DAG, contracts, acceptance commands, and boundaries.
+- Worker: one bounded task in an isolated worktree; does not commit.
 - Reviewer: independent correctness, security, and architecture review.
 - Tester: independent coverage and evidence review.
 
-## Scheduling
+## Completed Scheduling
 
-Use `contract-first` for the first run: sequential, plan approval, final
-approval, two bounded rework attempts.
-
-After contracts merge, use `mock-slice` with at most two parallel workers:
+The delivery followed a contract-first DAG:
 
 ```text
-contracts
-   +-> UXP shell --------+
-   +-> Mock API ---------+-> integration tests
+Stage 1 contracts
+   +-> Stage 2 Mock API --------+
+   +-> Stage 3 UXP shell -------+-> Stage 4 real-socket integration
+                                      -> Stage 5 delivery documentation
 ```
 
-The UXP and API tasks may run together only when their owned paths do not
-include shared contract files or the same root lockfile. Contract migrations,
-OpenAPI changes, and root dependency changes are serialized.
+Contract work was serialized before dependent API/UXP work. Workers owned
+disjoint paths; shared root files and lockfiles stayed controller-owned. Each
+phase passed deterministic tests, a read-only adversarial review, targeted
+fixes, retesting, and rereview before controller integration.
 
 ## Evidence Gates
 
-- Each task runs its declared acceptance commands.
-- Root `pnpm check`, `pnpm test`, and `pnpm build` must pass after integration.
-- Reviewer and Tester cannot write or approve failed commands.
-- Photoshop-specific claims remain unverified until tested in Photoshop 2026.
+- Contract package: `20/20` tests plus check/build.
+- Mock API: `59/59` tests plus check/build.
+- UXP shell: `130/130` Node tests plus project-pinned `tsc`, check/build.
+- Stage 4 root slice: `6/6` tests, including four real Node socket integration tests.
+- Current Stage 5 root suite: `14/14`, adding four deterministic release
+  packaging tests and four cross-platform command-runner tests.
+- Root/package check and build gates passed.
+- Staged changes: `git diff --cached --check` before handoff.
+
+Counts are the 2026-08-12 snapshot. Passing these gates verifies the Node
+implementation and development load tree, not the Photoshop host.
+
+## Remaining Execution Rule
+
+Photoshop-specific work must keep separate Windows and macOS evidence. A future
+worker may not mark proxy pixel export, `executeAsModal`, layer placement,
+history/undo, certificate trust, runtime source preservation, signed CCX, or
+marketplace compatibility complete without real Photoshop 2026 inspection.

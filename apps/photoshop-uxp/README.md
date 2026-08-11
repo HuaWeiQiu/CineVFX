@@ -89,8 +89,9 @@ Endpoints (metadata only):
 3. In UXP Developer Tool, add
    `apps\photoshop-uxp\dist\plugin\manifest.json`.
 4. Load the plugin and open the **CineVFX** panel.
-5. For explicit HTTP development, start the Mock API with
-   `CINEVFX_MOCK_ALLOW_HTTP=1` and change the panel URL to
+5. For explicit HTTP development, clear both Mock TLS file environment
+   variables, set `CINEVFX_MOCK_HOST=127.0.0.1` and
+   `CINEVFX_MOCK_ALLOW_HTTP=1`, then change the panel URL to
    `http://127.0.0.1:8787`. The canonical/default path remains trusted HTTPS.
 6. Windows runtime (Photoshop on Windows) is **UNVERIFIED** in this repository phase.
 

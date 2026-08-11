@@ -3,12 +3,13 @@
  * Does not package a signed CCX or fetch remote assets.
  */
 
-import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Script } from "node:vm";
-import { bundleClassicEntry } from "./bundle-classic.mjs";
-import { validateUxpManifest } from "./validate-uxp-manifest.mjs";
+import {
+  createUxpPluginArtifact,
+  UXP_PLUGIN_FILES,
+} from "./plugin-artifact.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(root, "dist");
@@ -16,10 +17,11 @@ const dist = join(root, "dist");
 await mkdir(dist, { recursive: true });
 
 const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8"));
-const manifestErrors = validateUxpManifest(manifest);
-if (manifestErrors.length > 0) {
-  throw new Error(`invalid UXP manifest: ${JSON.stringify(manifestErrors)}`);
+const { entries: pluginEntries, manifest } = await createUxpPluginArtifact({
+  rootDir: root,
+});
+if (pkg.version !== manifest.version) {
+  throw new Error("package.json and manifest.json versions must match");
 }
 
 // Recreate the loadable surface so removed/renamed source files cannot survive.
@@ -27,23 +29,9 @@ const pluginDir = join(dist, "plugin");
 await rm(pluginDir, { recursive: true, force: true });
 await mkdir(pluginDir, { recursive: true });
 
-for (const file of ["manifest.json", "styles.css"]) {
-  await cp(join(root, file), join(pluginDir, file));
+for (const entry of pluginEntries) {
+  await writeFile(join(pluginDir, entry.name), entry.data);
 }
-
-const sourceHtml = await readFile(join(root, "index.html"), "utf8");
-const classicHtml = sourceHtml.replace(
-  /<script\s+src="index\.js"\s+type="module"><\/script>/,
-  '<script src="index.js"></script>',
-);
-if (classicHtml === sourceHtml || classicHtml.includes('type="module"')) {
-  throw new Error("index.html must contain exactly one transformable module entry");
-}
-await writeFile(join(pluginDir, "index.html"), classicHtml, "utf8");
-
-const classicBundle = await bundleClassicEntry({ rootDir: root, entry: "index.js" });
-new Script(classicBundle, { filename: "dist/plugin/index.js" });
-await writeFile(join(pluginDir, "index.js"), classicBundle, "utf8");
 
 const summary = {
   package: pkg.name,
@@ -84,12 +72,7 @@ await writeFile(
 
 
 // Verify the sideload artifact is a minimal classic-script UXP surface.
-const requiredPluginFiles = [
-  "manifest.json",
-  "index.html",
-  "index.js",
-  "styles.css",
-];
+const requiredPluginFiles = [...UXP_PLUGIN_FILES];
 const { access: accessFile } = await import("node:fs/promises");
 for (const rel of requiredPluginFiles) {
   await accessFile(join(pluginDir, rel));

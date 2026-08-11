@@ -51,7 +51,9 @@ pnpm --dir apps/api-server test
 pnpm --dir apps/api-server build
 
 # explicit local HTTP opt-in (TLS is the CLI default)
-CINEVFX_MOCK_ALLOW_HTTP=1 pnpm --dir apps/api-server start
+env -u CINEVFX_MOCK_TLS_KEY_FILE -u CINEVFX_MOCK_TLS_CERT_FILE \
+  CINEVFX_MOCK_HOST=127.0.0.1 CINEVFX_MOCK_ALLOW_HTTP=1 \
+  pnpm --dir apps/api-server start
 ```
 
 Environment overrides:
