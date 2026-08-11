@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0.0",
+  "assetId": "asset_pass_effect_01",
+  "mediaType": "image/png",
+  "dimensions": {
+    "width": 1024,
+    "height": 1024
+  },
+  "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "alphaMode": "straight",
+  "byteLength": 180224,
+  "ttlSeconds": 3600,
+  "purpose": "pass",
+  "createdAt": "2026-08-12T10:00:20Z",
+  "colorSpace": "srgb",
+  "sourceRole": "generated_pass"
+}

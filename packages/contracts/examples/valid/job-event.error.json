@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "evt_job_mock_0002_0002",
+  "jobId": "job_mock_0002",
+  "sequence": 2,
+  "type": "error",
+  "state": "FAILED",
+  "timestamp": "2026-08-12T10:01:02Z",
+  "error": {
+    "code": "ASSET_DIGEST_MISMATCH",
+    "message": "Declared digest does not match stored asset metadata",
+    "retriable": false
+  }
+}

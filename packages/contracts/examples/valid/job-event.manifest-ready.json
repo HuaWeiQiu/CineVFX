@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "evt_job_mock_0001_0008",
+  "jobId": "job_mock_0001",
+  "sequence": 8,
+  "type": "manifest_ready",
+  "state": "SUCCEEDED",
+  "timestamp": "2026-08-12T10:00:18Z",
+  "manifestId": "manifest_mock_0001",
+  "message": "Validated Layer Manifest published"
+}

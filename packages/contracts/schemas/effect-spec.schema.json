@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "effect-spec.schema.json",
+  "title": "EffectSpec",
+  "description": "Versioned effect request describing normalized canvas, references, guidance, and deterministic primitives.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "effectSpecVersion",
+    "seed",
+    "canvas",
+    "references",
+    "guidance",
+    "primitives"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/SchemaVersion"
+    },
+    "effectSpecVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of the EffectSpec document contents."
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Optional human label. Benchmark fixtures may use values such as 'golden-magic-benchmark'."
+    },
+    "canvas": {
+      "$ref": "common.schema.json#/$defs/NormalizedCanvas"
+    },
+    "references": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "assetId",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/Id"
+          },
+          "assetId": {
+            "$ref": "common.schema.json#/$defs/AssetId"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "effect",
+              "style",
+              "mask",
+              "depth",
+              "normal",
+              "environment"
+            ]
+          },
+          "digest": {
+            "$ref": "common.schema.json#/$defs/Digest"
+          },
+          "weight": {
+            "$ref": "common.schema.json#/$defs/UnitInterval"
+          }
+        }
+      }
+    },
+    "guidance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchors",
+        "strength"
+      ],
+      "properties": {
+        "anchors": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "point"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "common.schema.json#/$defs/Id"
+              },
+              "point": {
+                "$ref": "common.schema.json#/$defs/NormalizedPoint"
+              },
+              "radius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "strength": {
+          "$ref": "common.schema.json#/$defs/UnitInterval"
+        },
+        "subjectMaskAssetId": {
+          "$ref": "common.schema.json#/$defs/AssetId"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "primitives": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "enabled",
+          "params"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "curve",
+              "particle",
+              "volume",
+              "sprite",
+              "surface",
+              "lens"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "params": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 32,
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,31}$"
+            },
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "maxLength": 64
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fixtureId": {
+          "type": "string",
+          "pattern": "^bench_[a-z0-9_]{1,48}$"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    }
+  }
+}

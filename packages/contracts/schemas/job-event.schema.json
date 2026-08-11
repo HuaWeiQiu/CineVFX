@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "job-event.schema.json",
+  "title": "JobEvent",
+  "description": "Ordered job lifecycle or progress event with type/state payload constraints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "jobId",
+    "sequence",
+    "type",
+    "state",
+    "timestamp"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/SchemaVersion"
+    },
+    "eventId": {
+      "type": "string",
+      "pattern": "^evt_[a-z0-9_]{1,58}$"
+    },
+    "jobId": {
+      "$ref": "common.schema.json#/$defs/JobId"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "state_changed",
+        "progress",
+        "asset_ready",
+        "manifest_ready",
+        "cancel_accepted",
+        "error"
+      ]
+    },
+    "state": {
+      "$ref": "common.schema.json#/$defs/JobState"
+    },
+    "timestamp": {
+      "$ref": "common.schema.json#/$defs/IsoDateTime"
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ratio"],
+      "properties": {
+        "ratio": {
+          "$ref": "common.schema.json#/$defs/UnitInterval"
+        },
+        "stage": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "error": {
+      "$ref": "common.schema.json#/$defs/ErrorObject"
+    },
+    "assetRef": {
+      "$ref": "common.schema.json#/$defs/VerifiedAssetRef"
+    },
+    "manifestId": {
+      "type": "string",
+      "pattern": "^manifest_[a-z0-9_]{1,48}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "type": { "const": "error" } },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["error"],
+        "properties": {
+          "state": { "const": "FAILED" }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["manifestId"] },
+            { "required": ["assetRef"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "manifest_ready" } },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["manifestId"],
+        "properties": {
+          "state": { "const": "SUCCEEDED" }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["error"] },
+            { "required": ["assetRef"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "progress" } },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["progress"],
+        "properties": {
+          "state": {
+            "$ref": "common.schema.json#/$defs/ActiveJobState"
+          }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["error"] },
+            { "required": ["manifestId"] },
+            { "required": ["assetRef"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "asset_ready" } },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["assetRef"],
+        "properties": {
+          "state": {
+            "$ref": "common.schema.json#/$defs/ActiveJobState"
+          }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["error"] },
+            { "required": ["manifestId"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "cancel_accepted" } },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "state": { "const": "CANCELLED" }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["error"] },
+            { "required": ["manifestId"] },
+            { "required": ["assetRef"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "state_changed" } },
+        "required": ["type"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["error"] },
+            { "required": ["manifestId"] },
+            { "required": ["assetRef"] }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "asset-descriptor.schema.json",
+  "title": "AssetDescriptor",
+  "description": "Metadata for an uploaded or produced media asset. Never embeds image bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "assetId",
+    "mediaType",
+    "dimensions",
+    "digest",
+    "alphaMode",
+    "byteLength",
+    "ttlSeconds",
+    "purpose",
+    "createdAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/SchemaVersion"
+    },
+    "assetId": {
+      "$ref": "common.schema.json#/$defs/AssetId"
+    },
+    "mediaType": {
+      "$ref": "common.schema.json#/$defs/MediaType"
+    },
+    "dimensions": {
+      "$ref": "common.schema.json#/$defs/Dimensions"
+    },
+    "digest": {
+      "$ref": "common.schema.json#/$defs/Digest"
+    },
+    "alphaMode": {
+      "$ref": "common.schema.json#/$defs/AlphaMode"
+    },
+    "byteLength": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 104857600
+    },
+    "ttlSeconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 604800
+    },
+    "purpose": {
+      "$ref": "common.schema.json#/$defs/AssetPurpose"
+    },
+    "createdAt": {
+      "$ref": "common.schema.json#/$defs/IsoDateTime"
+    },
+    "colorSpace": {
+      "$ref": "common.schema.json#/$defs/ColorSpace"
+    },
+    "expiresAt": {
+      "$ref": "common.schema.json#/$defs/IsoDateTime"
+    },
+    "sourceRole": {
+      "type": "string",
+      "enum": [
+        "user_proxy",
+        "user_mask",
+        "user_effect_reference",
+        "generated_pass",
+        "system_metadata"
+      ]
+    }
+  }
+}

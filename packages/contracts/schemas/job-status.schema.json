@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "job-status.schema.json",
+  "title": "JobStatus",
+  "description": "State-discriminated monotonic job lifecycle snapshot.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "idempotencyKey",
+    "state",
+    "progress",
+    "createdAt",
+    "updatedAt",
+    "cancelRequested"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/SchemaVersion"
+    },
+    "jobId": {
+      "$ref": "common.schema.json#/$defs/JobId"
+    },
+    "idempotencyKey": {
+      "$ref": "common.schema.json#/$defs/IdempotencyKey"
+    },
+    "state": {
+      "$ref": "common.schema.json#/$defs/JobState"
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ratio", "stage"],
+      "properties": {
+        "ratio": {
+          "$ref": "common.schema.json#/$defs/UnitInterval"
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "createdAt": {
+      "$ref": "common.schema.json#/$defs/IsoDateTime"
+    },
+    "updatedAt": {
+      "$ref": "common.schema.json#/$defs/IsoDateTime"
+    },
+    "startedAt": {
+      "$ref": "common.schema.json#/$defs/IsoDateTime"
+    },
+    "finishedAt": {
+      "$ref": "common.schema.json#/$defs/IsoDateTime"
+    },
+    "cancelRequested": {
+      "type": "boolean"
+    },
+    "error": {
+      "$ref": "common.schema.json#/$defs/ErrorObject"
+    },
+    "manifestId": {
+      "type": "string",
+      "pattern": "^manifest_[a-z0-9_]{1,48}$"
+    },
+    "eventCount": {
+      "$ref": "common.schema.json#/$defs/NonNegativeInt"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "state": { "const": "CREATED" } },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "cancelRequested": { "const": false },
+          "progress": {
+            "type": "object",
+            "required": ["ratio"],
+            "properties": {
+              "ratio": { "const": 0 }
+            }
+          }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["manifestId"] },
+            { "required": ["error"] },
+            { "required": ["finishedAt"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "VALIDATING",
+              "QUEUED",
+              "PREPROCESSING",
+              "RENDERING",
+              "POSTPROCESSING",
+              "EXPORTING"
+            ]
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["manifestId"] },
+            { "required": ["error"] },
+            { "required": ["finishedAt"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "state": { "const": "SUCCEEDED" } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["manifestId", "finishedAt"],
+        "properties": {
+          "cancelRequested": { "const": false },
+          "progress": {
+            "type": "object",
+            "required": ["ratio", "stage"],
+            "properties": {
+              "ratio": { "const": 1 }
+            }
+          }
+        },
+        "not": {
+          "required": ["error"]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "state": { "const": "FAILED" } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["error", "finishedAt"],
+        "properties": {
+          "cancelRequested": { "const": false }
+        },
+        "not": {
+          "required": ["manifestId"]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "state": { "const": "CANCELLED" } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["finishedAt"],
+        "properties": {
+          "cancelRequested": { "const": true }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["manifestId"] },
+            { "required": ["error"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "state": { "const": "EXPIRED" } },
+        "required": ["state"]
+      },
+      "then": {
+        "required": ["finishedAt"],
+        "properties": {
+          "cancelRequested": { "const": false }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["manifestId"] },
+            { "required": ["error"] }
+          ]
+        }
+      }
+    }
+  ]
+}

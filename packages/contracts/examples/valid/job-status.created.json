@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "jobId": "job_mock_0001",
+  "idempotencyKey": "idem_mock_slice_request_0001",
+  "state": "CREATED",
+  "progress": {
+    "ratio": 0,
+    "stage": "accepted",
+    "message": "Job accepted"
+  },
+  "createdAt": "2026-08-12T10:00:05Z",
+  "updatedAt": "2026-08-12T10:00:05Z",
+  "cancelRequested": false,
+  "eventCount": 1
+}

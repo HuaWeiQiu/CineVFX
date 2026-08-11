@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "1.0.0",
+  "idempotencyKey": "idem_mock_slice_request_0001",
+  "clientRequestId": "uxp_panel_req_0001",
+  "effectSpec": {
+    "schemaVersion": "1.0.0",
+    "effectSpecVersion": "1.0.0",
+    "seed": 42,
+    "label": "golden-magic-benchmark",
+    "canvas": {
+      "width": 1024,
+      "height": 1024,
+      "colorSpace": "srgb",
+      "pixelAspectRatio": 1,
+      "normalized": true
+    },
+    "references": [
+      {
+        "id": "effect_ref",
+        "assetId": "asset_effect_ref_01",
+        "role": "effect",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "weight": 1
+      }
+    ],
+    "guidance": {
+      "anchors": [
+        {
+          "id": "anchor_center",
+          "point": { "x": 0.5, "y": 0.42 },
+          "radius": 0.18
+        }
+      ],
+      "strength": 0.72,
+      "subjectMaskAssetId": "asset_subject_mask_01",
+      "notes": "benchmark fixture only"
+    },
+    "primitives": [
+      {
+        "id": "spark_curve",
+        "kind": "curve",
+        "enabled": true,
+        "params": {
+          "intensity": 0.8,
+          "thickness": 0.03,
+          "segments": 12
+        }
+      }
+    ],
+    "benchmark": {
+      "fixtureId": "bench_golden_magic",
+      "description": "Labeled golden-magic benchmark fixture; not a product mode discriminator."
+    }
+  },
+  "inputAssets": [
+    {
+      "assetId": "asset_proxy_source_01",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "purpose": "proxy"
+    },
+    {
+      "assetId": "asset_subject_mask_01",
+      "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "purpose": "mask"
+    },
+    {
+      "assetId": "asset_effect_ref_01",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "purpose": "effect_reference"
+    }
+  ],
+  "protectedSource": {
+    "layerStableId": "ps_layer_stable_source_01",
+    "documentStableId": "ps_doc_stable_01",
+    "immutable": true,
+    "operationsForbidden": [
+      "modify_pixels",
+      "move",
+      "transform",
+      "resize",
+      "replace",
+      "warp",
+      "delete"
+    ]
+  },
+  "options": {
+    "priority": "normal",
+    "dryRun": false,
+    "ttlSeconds": 1800
+  }
+}

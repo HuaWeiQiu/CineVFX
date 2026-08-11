@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "evt_job_mock_0001_0004",
+  "jobId": "job_mock_0001",
+  "sequence": 4,
+  "type": "progress",
+  "state": "RENDERING",
+  "timestamp": "2026-08-12T10:00:12Z",
+  "progress": {
+    "ratio": 0.55,
+    "stage": "render_passes"
+  },
+  "message": "Pass 2 of 4"
+}

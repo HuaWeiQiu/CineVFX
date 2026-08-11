@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "effectSpec": {
+    "schemaVersion": "1.0.0",
+    "effectSpecVersion": "1.0.0",
+    "seed": 1,
+    "canvas": {
+      "width": 64,
+      "height": 64,
+      "colorSpace": "srgb",
+      "pixelAspectRatio": 1,
+      "normalized": true
+    },
+    "references": [
+      {
+        "id": "effect_ref",
+        "assetId": "asset_effect_ref_01",
+        "role": "effect"
+      }
+    ],
+    "guidance": {
+      "anchors": [],
+      "strength": 0.1
+    },
+    "primitives": [
+      {
+        "id": "p1",
+        "kind": "sprite",
+        "enabled": true,
+        "params": { "scale": 1 }
+      }
+    ]
+  },
+  "inputAssets": [
+    {
+      "assetId": "asset_proxy_source_01",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "purpose": "proxy"
+    }
+  ],
+  "protectedSource": {
+    "layerStableId": "ps_layer_stable_source_01",
+    "immutable": true,
+    "operationsForbidden": [
+      "modify_pixels",
+      "move",
+      "transform",
+      "resize",
+      "replace"
+    ]
+  }
+}

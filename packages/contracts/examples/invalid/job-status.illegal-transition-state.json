@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "jobId": "job_mock_bad",
+  "idempotencyKey": "idem_mock_bad_state",
+  "state": "RUNNING",
+  "progress": {
+    "ratio": 0.1,
+    "stage": "unknown"
+  },
+  "createdAt": "2026-08-12T10:00:00Z",
+  "updatedAt": "2026-08-12T10:00:01Z",
+  "cancelRequested": false
+}

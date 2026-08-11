@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0",
+  "jobId": "job_mock_bad",
+  "idempotencyKey": "idem_mock_bad_created_manifest",
+  "state": "CREATED",
+  "progress": {
+    "ratio": 0,
+    "stage": "accepted"
+  },
+  "createdAt": "2026-08-12T10:00:00Z",
+  "updatedAt": "2026-08-12T10:00:00Z",
+  "finishedAt": "2026-08-12T10:00:01Z",
+  "cancelRequested": false,
+  "manifestId": "manifest_should_not_exist",
+  "error": {
+    "code": "SHOULD_NOT_EXIST",
+    "message": "CREATED cannot carry terminal fields"
+  }
+}

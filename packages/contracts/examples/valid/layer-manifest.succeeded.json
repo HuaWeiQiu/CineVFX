@@ -1,0 +1,170 @@
+{
+  "schemaVersion": "1.0.0",
+  "manifestId": "manifest_mock_0001",
+  "jobId": "job_mock_0001",
+  "createdAt": "2026-08-12T10:00:18Z",
+  "canvas": {
+    "width": 1024,
+    "height": 1024,
+    "colorSpace": "srgb",
+    "pixelAspectRatio": 1,
+    "normalized": true
+  },
+  "protectedSource": {
+    "layerStableId": "ps_layer_stable_source_01",
+    "documentStableId": "ps_doc_stable_01",
+    "immutable": true,
+    "untouched": true
+  },
+  "groupName": "CineVFX Passes",
+  "passes": [
+    {
+      "id": "pass_effect",
+      "name": "Effect",
+      "order": 0,
+      "kind": "effect",
+      "editable": true,
+      "visible": true,
+      "opacity": 1,
+      "blendMode": "screen",
+      "asset": {
+        "assetId": "asset_pass_effect_01",
+        "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "mask": {
+        "asset": {
+          "assetId": "asset_pass_effect_mask_01",
+          "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "inverted": false,
+        "density": 1
+      },
+      "adjustments": {
+        "exposure": 0.1,
+        "saturation": 0.05
+      }
+    },
+    {
+      "id": "pass_relight",
+      "name": "Relight",
+      "order": 1,
+      "kind": "relight",
+      "editable": true,
+      "visible": true,
+      "opacity": 0.65,
+      "blendMode": "soft_light",
+      "asset": {
+        "assetId": "asset_pass_relight_01",
+        "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      "adjustments": {
+        "temperature": 0.08,
+        "contrast": 0.05
+      }
+    },
+    {
+      "id": "pass_atmosphere",
+      "name": "Atmosphere",
+      "order": 2,
+      "kind": "atmosphere",
+      "editable": true,
+      "visible": true,
+      "opacity": 0.4,
+      "blendMode": "screen",
+      "asset": {
+        "assetId": "asset_pass_atmosphere_01",
+        "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+      }
+    },
+    {
+      "id": "pass_grade",
+      "name": "Grade",
+      "order": 3,
+      "kind": "grade",
+      "editable": true,
+      "visible": true,
+      "opacity": 0.35,
+      "blendMode": "color",
+      "asset": {
+        "assetId": "asset_pass_grade_01",
+        "digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "adjustments": {
+        "tint": -0.02,
+        "contrast": 0.03
+      }
+    },
+    {
+      "id": "pass_bloom",
+      "name": "Bloom",
+      "order": 4,
+      "kind": "bloom",
+      "editable": true,
+      "visible": true,
+      "opacity": 0.5,
+      "blendMode": "linear_dodge",
+      "asset": {
+        "assetId": "asset_pass_bloom_01",
+        "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "adjustments": {
+        "blurRadius": 4.5
+      }
+    }
+  ],
+  "assets": [
+    {
+      "assetId": "asset_pass_effect_01",
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "mediaType": "image/png",
+      "purpose": "pass",
+      "verified": true,
+      "dimensions": { "width": 1024, "height": 1024 }
+    },
+    {
+      "assetId": "asset_pass_effect_mask_01",
+      "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "mediaType": "image/png",
+      "purpose": "mask",
+      "verified": true,
+      "dimensions": { "width": 1024, "height": 1024 }
+    },
+    {
+      "assetId": "asset_pass_relight_01",
+      "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "mediaType": "image/png",
+      "purpose": "pass",
+      "verified": true,
+      "dimensions": { "width": 1024, "height": 1024 }
+    },
+    {
+      "assetId": "asset_pass_atmosphere_01",
+      "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "mediaType": "image/png",
+      "purpose": "pass",
+      "verified": true,
+      "dimensions": { "width": 1024, "height": 1024 }
+    },
+    {
+      "assetId": "asset_pass_grade_01",
+      "digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "mediaType": "image/png",
+      "purpose": "pass",
+      "verified": true,
+      "dimensions": { "width": 1024, "height": 1024 }
+    },
+    {
+      "assetId": "asset_pass_bloom_01",
+      "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "mediaType": "image/png",
+      "purpose": "pass",
+      "verified": true,
+      "dimensions": { "width": 1024, "height": 1024 }
+    }
+  ],
+  "importHints": {
+    "singleHistoryState": true,
+    "placeAboveProtectedSource": true,
+    "rollbackOnAnyFailure": true
+  }
+}

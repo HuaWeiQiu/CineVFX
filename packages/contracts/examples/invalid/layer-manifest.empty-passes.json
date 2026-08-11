@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0.0",
+  "manifestId": "manifest_bad_0004",
+  "jobId": "job_mock_bad",
+  "createdAt": "2026-08-12T10:00:18Z",
+  "canvas": {
+    "width": 64,
+    "height": 64,
+    "colorSpace": "srgb",
+    "pixelAspectRatio": 1,
+    "normalized": true
+  },
+  "protectedSource": {
+    "layerStableId": "ps_layer_stable_source_01",
+    "immutable": true,
+    "untouched": true
+  },
+  "passes": [],
+  "assets": [
+    {
+      "assetId": "asset_pass_effect_01",
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "mediaType": "image/png",
+      "purpose": "pass",
+      "verified": true
+    }
+  ]
+}

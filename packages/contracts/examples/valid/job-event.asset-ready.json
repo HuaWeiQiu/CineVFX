@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "evt_job_mock_0001_0005",
+  "jobId": "job_mock_0001",
+  "sequence": 5,
+  "type": "asset_ready",
+  "state": "RENDERING",
+  "timestamp": "2026-08-12T10:00:13Z",
+  "assetRef": {
+    "assetId": "asset_pass_effect_01",
+    "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "message": "Effect pass asset ready"
+}

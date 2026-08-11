@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "assetId": "asset_proxy_source_01",
+  "mediaType": "image/png",
+  "dimensions": {
+    "width": 1024,
+    "height": 1024
+  },
+  "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "alphaMode": "straight",
+  "byteLength": 100,
+  "purpose": "proxy",
+  "createdAt": "2026-08-12T10:00:00Z"
+}

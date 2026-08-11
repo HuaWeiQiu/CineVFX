@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "layer-manifest.schema.json",
+  "title": "LayerManifest",
+  "description": "Validated ordered editable passes for Photoshop import. Successful jobs always include this document.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "manifestId",
+    "jobId",
+    "createdAt",
+    "canvas",
+    "protectedSource",
+    "passes",
+    "assets"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/SchemaVersion"
+    },
+    "manifestId": {
+      "type": "string",
+      "pattern": "^manifest_[a-z0-9_]{1,48}$"
+    },
+    "jobId": {
+      "$ref": "common.schema.json#/$defs/JobId"
+    },
+    "createdAt": {
+      "$ref": "common.schema.json#/$defs/IsoDateTime"
+    },
+    "canvas": {
+      "$ref": "common.schema.json#/$defs/NormalizedCanvas"
+    },
+    "protectedSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layerStableId",
+        "immutable",
+        "untouched"
+      ],
+      "properties": {
+        "layerStableId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "documentStableId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "immutable": {
+          "type": "boolean",
+          "const": true
+        },
+        "untouched": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
+    "groupName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "passes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "order",
+          "kind",
+          "editable",
+          "visible",
+          "opacity",
+          "blendMode",
+          "asset"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/Id"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "effect",
+              "relight",
+              "atmosphere",
+              "grade",
+              "bloom",
+              "mask",
+              "utility"
+            ]
+          },
+          "editable": {
+            "type": "boolean",
+            "const": true
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "opacity": {
+            "$ref": "common.schema.json#/$defs/UnitInterval"
+          },
+          "blendMode": {
+            "$ref": "common.schema.json#/$defs/BlendMode"
+          },
+          "asset": {
+            "$ref": "common.schema.json#/$defs/VerifiedAssetRef"
+          },
+          "mask": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "asset"
+            ],
+            "properties": {
+              "asset": {
+                "$ref": "common.schema.json#/$defs/VerifiedAssetRef"
+              },
+              "inverted": {
+                "type": "boolean"
+              },
+              "density": {
+                "$ref": "common.schema.json#/$defs/UnitInterval"
+              }
+            }
+          },
+          "adjustments": {
+            "$ref": "common.schema.json#/$defs/PassAdjustments"
+          }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assetId",
+          "digest",
+          "mediaType",
+          "purpose",
+          "verified"
+        ],
+        "properties": {
+          "assetId": {
+            "$ref": "common.schema.json#/$defs/AssetId"
+          },
+          "digest": {
+            "$ref": "common.schema.json#/$defs/Digest"
+          },
+          "mediaType": {
+            "$ref": "common.schema.json#/$defs/MediaType"
+          },
+          "purpose": {
+            "$ref": "common.schema.json#/$defs/AssetPurpose"
+          },
+          "verified": {
+            "type": "boolean",
+            "const": true
+          },
+          "dimensions": {
+            "$ref": "common.schema.json#/$defs/Dimensions"
+          }
+        }
+      }
+    },
+    "importHints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "singleHistoryState": {
+          "type": "boolean",
+          "const": true
+        },
+        "placeAboveProtectedSource": {
+          "type": "boolean"
+        },
+        "rollbackOnAnyFailure": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    }
+  }
+}

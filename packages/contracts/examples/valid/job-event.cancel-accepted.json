@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "evt_job_mock_0003_0003",
+  "jobId": "job_mock_0003",
+  "sequence": 3,
+  "type": "cancel_accepted",
+  "state": "CANCELLED",
+  "timestamp": "2026-08-12T10:02:05Z",
+  "message": "Cancellation completed"
+}

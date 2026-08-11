@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "build-time",
+  "documents": [
+    "EffectSpec",
+    "AssetDescriptor",
+    "JobRequest",
+    "JobStatus",
+    "JobEvent",
+    "LayerManifest"
+  ],
+  "mockEndpoints": [
+    "POST /v1/assets",
+    "POST /v1/jobs",
+    "GET /v1/jobs/{id}",
+    "GET /v1/jobs/{id}/events",
+    "POST /v1/jobs/{id}/cancel",
+    "GET /v1/jobs/{id}/manifest"
+  ],
+  "typeGenerator": "schema-driven"
+}

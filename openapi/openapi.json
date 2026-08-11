@@ -1,0 +1,491 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CineVFX Mock API",
+    "version": "1.0.0",
+    "description": "Versioned Mock vertical-slice API for assets, jobs, events, cancellation, and Layer Manifest publication. Agrees with packages/contracts schemas and examples."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8787",
+      "description": "Local Mock API"
+    }
+  ],
+  "tags": [
+    {
+      "name": "assets"
+    },
+    {
+      "name": "jobs"
+    }
+  ],
+  "paths": {
+    "/v1/assets": {
+      "post": {
+        "operationId": "createAsset",
+        "tags": [
+          "assets"
+        ],
+        "summary": "Register asset metadata for an uploaded proxy, mask, or effect reference",
+        "description": "Accepts asset metadata only. Image bytes are transferred out of band and never appear in contract examples or logs.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetDescriptor"
+              },
+              "examples": {
+                "proxy": {
+                  "$ref": "#/components/examples/AssetDescriptorProxy"
+                },
+                "effectReference": {
+                  "$ref": "#/components/examples/AssetDescriptorEffectReference"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Asset metadata accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDescriptor"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "description": "Digest conflict for existing assetId"
+          }
+        }
+      }
+    },
+    "/v1/jobs": {
+      "post": {
+        "operationId": "createJob",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Create or replay an idempotent VFX job",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^idem_[A-Za-z0-9_-]{8,128}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobRequest"
+              },
+              "examples": {
+                "mockSlice": {
+                  "$ref": "#/components/examples/JobRequestMock"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "created": {
+                    "$ref": "#/components/examples/JobStatusCreated"
+                  }
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay of an existing job with the same idempotencyKey",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "replayCreated": {
+                    "$ref": "#/components/examples/JobStatusCreated"
+                  },
+                  "replaySucceeded": {
+                    "$ref": "#/components/examples/JobStatusSucceeded"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, including Idempotency-Key header/body mismatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorObject"
+                }
+              }
+            }
+          }
+        },
+        "description": "Create a new job or replay an existing one. The canonical idempotency key is JobRequest.idempotencyKey. The required Idempotency-Key header MUST equal the body field exactly; mismatched keys are rejected with 400. Replaying the same key and equivalent body returns 200 with the existing JobStatus."
+      }
+    },
+    "/v1/jobs/{id}": {
+      "get": {
+        "operationId": "getJob",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Fetch current job status",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "rendering": {
+                    "$ref": "#/components/examples/JobStatusRendering"
+                  },
+                  "succeeded": {
+                    "$ref": "#/components/examples/JobStatusSucceeded"
+                  },
+                  "failed": {
+                    "$ref": "#/components/examples/JobStatusFailed"
+                  },
+                  "cancelled": {
+                    "$ref": "#/components/examples/JobStatusCancelled"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}/events": {
+      "get": {
+        "operationId": "listJobEvents",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "List ordered job events",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobId"
+          },
+          {
+            "name": "afterSequence",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": -1,
+              "default": -1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ordered events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobEventsResponse"
+                },
+                "examples": {
+                  "progressAndReady": {
+                    "value": {
+                      "jobId": "job_mock_0001",
+                      "events": [
+                        {
+                          "schemaVersion": "1.0.0",
+                          "eventId": "evt_job_mock_0001_0003",
+                          "jobId": "job_mock_0001",
+                          "sequence": 3,
+                          "type": "state_changed",
+                          "state": "RENDERING",
+                          "timestamp": "2026-08-12T10:00:10Z",
+                          "message": "Entered rendering"
+                        },
+                        {
+                          "schemaVersion": "1.0.0",
+                          "eventId": "evt_job_mock_0001_0004",
+                          "jobId": "job_mock_0001",
+                          "sequence": 4,
+                          "type": "progress",
+                          "state": "RENDERING",
+                          "timestamp": "2026-08-12T10:00:12Z",
+                          "progress": {
+                            "ratio": 0.55,
+                            "stage": "render_passes"
+                          },
+                          "message": "Pass 2 of 4"
+                        },
+                        {
+                          "schemaVersion": "1.0.0",
+                          "eventId": "evt_job_mock_0001_0008",
+                          "jobId": "job_mock_0001",
+                          "sequence": 8,
+                          "type": "manifest_ready",
+                          "state": "SUCCEEDED",
+                          "timestamp": "2026-08-12T10:00:18Z",
+                          "manifestId": "manifest_mock_0001",
+                          "message": "Validated Layer Manifest published"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}/cancel": {
+      "post": {
+        "operationId": "cancelJob",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Request job cancellation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation accepted or already terminal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "cancelled": {
+                    "$ref": "#/components/examples/JobStatusCancelled"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "description": "Job already terminal in a non-cancelled state"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}/manifest": {
+      "get": {
+        "operationId": "getJobManifest",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Fetch validated Layer Manifest for a succeeded job",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validated Layer Manifest with editable passes and verified digests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LayerManifest"
+                },
+                "examples": {
+                  "succeeded": {
+                    "$ref": "#/components/examples/LayerManifestSucceeded"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found"
+          },
+          "409": {
+            "description": "Job has not succeeded; manifest unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "JobId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/JobId"
+        }
+      }
+    },
+    "responses": {
+      "ErrorResponse": {
+        "description": "Request failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorObject"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "SchemaVersion": {
+        "type": "string",
+        "const": "1.0.0"
+      },
+      "JobId": {
+        "type": "string",
+        "pattern": "^job_[a-z0-9_]{1,58}$"
+      },
+      "AssetId": {
+        "type": "string",
+        "pattern": "^asset_[a-z0-9_]{1,56}$"
+      },
+      "Digest": {
+        "type": "string",
+        "pattern": "^sha256:[a-f0-9]{64}$"
+      },
+      "ErrorObject": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "retriable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EffectSpec": {
+        "$ref": "../packages/contracts/schemas/effect-spec.schema.json"
+      },
+      "AssetDescriptor": {
+        "$ref": "../packages/contracts/schemas/asset-descriptor.schema.json"
+      },
+      "JobRequest": {
+        "$ref": "../packages/contracts/schemas/job-request.schema.json"
+      },
+      "JobStatus": {
+        "$ref": "../packages/contracts/schemas/job-status.schema.json"
+      },
+      "JobEvent": {
+        "$ref": "../packages/contracts/schemas/job-event.schema.json"
+      },
+      "LayerManifest": {
+        "$ref": "../packages/contracts/schemas/layer-manifest.schema.json"
+      },
+      "JobEventsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "jobId",
+          "events"
+        ],
+        "description": "Ordered event stream. Sequences are unique and strictly increasing.",
+        "properties": {
+          "jobId": {
+            "$ref": "#/components/schemas/JobId"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobEvent"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "AssetDescriptorProxy": {
+        "summary": "Proxy asset metadata",
+        "externalValue": "../packages/contracts/examples/valid/asset-descriptor.proxy.json"
+      },
+      "AssetDescriptorEffectReference": {
+        "summary": "Arbitrary effect reference metadata",
+        "externalValue": "../packages/contracts/examples/valid/asset-descriptor.effect-reference.json"
+      },
+      "JobRequestMock": {
+        "summary": "Mock vertical-slice job request",
+        "externalValue": "../packages/contracts/examples/valid/job-request.mock.json"
+      },
+      "JobStatusCreated": {
+        "summary": "Created job",
+        "externalValue": "../packages/contracts/examples/valid/job-status.created.json"
+      },
+      "JobStatusRendering": {
+        "summary": "Rendering job",
+        "externalValue": "../packages/contracts/examples/valid/job-status.rendering.json"
+      },
+      "JobStatusSucceeded": {
+        "summary": "Succeeded job with manifest id",
+        "externalValue": "../packages/contracts/examples/valid/job-status.succeeded.json"
+      },
+      "JobStatusFailed": {
+        "summary": "Failed job",
+        "externalValue": "../packages/contracts/examples/valid/job-status.failed.json"
+      },
+      "JobStatusCancelled": {
+        "summary": "Cancelled job",
+        "externalValue": "../packages/contracts/examples/valid/job-status.cancelled.json"
+      },
+      "LayerManifestSucceeded": {
+        "summary": "Validated Layer Manifest with editable passes",
+        "externalValue": "../packages/contracts/examples/valid/layer-manifest.succeeded.json"
+      }
+    }
+  }
+}

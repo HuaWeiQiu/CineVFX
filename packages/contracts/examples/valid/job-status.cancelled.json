@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0.0",
+  "jobId": "job_mock_0003",
+  "idempotencyKey": "idem_mock_slice_request_0003",
+  "state": "CANCELLED",
+  "progress": {
+    "ratio": 0.4,
+    "stage": "rendering",
+    "message": "Cancellation accepted"
+  },
+  "createdAt": "2026-08-12T10:02:00Z",
+  "updatedAt": "2026-08-12T10:02:05Z",
+  "startedAt": "2026-08-12T10:02:01Z",
+  "finishedAt": "2026-08-12T10:02:05Z",
+  "cancelRequested": true,
+  "eventCount": 4
+}

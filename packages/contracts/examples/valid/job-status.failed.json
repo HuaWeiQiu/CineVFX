@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "jobId": "job_mock_0002",
+  "idempotencyKey": "idem_mock_slice_request_0002",
+  "state": "FAILED",
+  "progress": {
+    "ratio": 0.3,
+    "stage": "validating",
+    "message": "Asset digest mismatch"
+  },
+  "createdAt": "2026-08-12T10:01:00Z",
+  "updatedAt": "2026-08-12T10:01:02Z",
+  "startedAt": "2026-08-12T10:01:00Z",
+  "finishedAt": "2026-08-12T10:01:02Z",
+  "cancelRequested": false,
+  "error": {
+    "code": "ASSET_DIGEST_MISMATCH",
+    "message": "Declared digest does not match stored asset metadata",
+    "retriable": false
+  },
+  "eventCount": 3
+}

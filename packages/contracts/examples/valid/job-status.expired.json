@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "jobId": "job_mock_0004",
+  "idempotencyKey": "idem_mock_slice_request_0004",
+  "state": "EXPIRED",
+  "progress": {
+    "ratio": 0,
+    "stage": "queued",
+    "message": "TTL elapsed before start"
+  },
+  "createdAt": "2026-08-12T09:00:00Z",
+  "updatedAt": "2026-08-12T09:30:00Z",
+  "finishedAt": "2026-08-12T09:30:00Z",
+  "cancelRequested": false,
+  "eventCount": 2
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "evt_job_mock_bad_cancel",
+  "jobId": "job_mock_bad",
+  "sequence": 1,
+  "type": "cancel_accepted",
+  "state": "CREATED",
+  "timestamp": "2026-08-12T10:00:00Z",
+  "message": "Illegal cancel acceptance in CREATED"
+}

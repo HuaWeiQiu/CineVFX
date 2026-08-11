@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0.0",
+  "effectSpecVersion": "1.0.0",
+  "seed": 7,
+  "label": "arbitrary-fire-reference",
+  "canvas": {
+    "width": 1536,
+    "height": 1024,
+    "colorSpace": "srgb",
+    "pixelAspectRatio": 1,
+    "normalized": true
+  },
+  "references": [
+    {
+      "id": "fire_plate",
+      "assetId": "asset_fire_plate_01",
+      "role": "effect",
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "weight": 0.9
+    },
+    {
+      "id": "env_light",
+      "assetId": "asset_env_light_01",
+      "role": "environment",
+      "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "weight": 0.4
+    }
+  ],
+  "guidance": {
+    "anchors": [
+      {
+        "id": "base",
+        "point": { "x": 0.48, "y": 0.78 },
+        "radius": 0.2
+      }
+    ],
+    "strength": 0.55
+  },
+  "primitives": [
+    {
+      "id": "ember_particles",
+      "kind": "particle",
+      "enabled": true,
+      "params": {
+        "count": 240,
+        "updraft": 0.7,
+        "size": 0.02
+      }
+    },
+    {
+      "id": "flame_surface",
+      "kind": "surface",
+      "enabled": true,
+      "params": {
+        "turbulence": 0.45,
+        "emissive": 0.8
+      }
+    }
+  ]
+}

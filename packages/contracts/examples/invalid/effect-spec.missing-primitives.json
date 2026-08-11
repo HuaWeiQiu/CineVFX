@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0.0",
+  "effectSpecVersion": "1.0.0",
+  "seed": 1,
+  "canvas": {
+    "width": 100,
+    "height": 100,
+    "colorSpace": "srgb",
+    "pixelAspectRatio": 1,
+    "normalized": true
+  },
+  "references": [
+    {
+      "id": "effect_ref",
+      "assetId": "asset_effect_ref_01",
+      "role": "effect"
+    }
+  ],
+  "guidance": {
+    "anchors": [],
+    "strength": 0.5
+  },
+  "primitives": []
+}
