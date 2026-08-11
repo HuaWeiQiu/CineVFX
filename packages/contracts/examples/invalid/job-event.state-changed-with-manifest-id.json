@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "evt_job_mock_bad_sc_manifest",
+  "jobId": "job_mock_bad",
+  "sequence": 5,
+  "type": "state_changed",
+  "state": "SUCCEEDED",
+  "timestamp": "2026-08-12T10:00:05Z",
+  "manifestId": "manifest_mock_0001"
+}

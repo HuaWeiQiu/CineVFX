@@ -2,7 +2,7 @@
  * Generated TypeScript contract types for @cinevfx/contracts.
  * Source of truth: packages/contracts/schemas/*.schema.json
  * Do not edit by hand; regenerate with `pnpm --dir packages/contracts build`.
- * // schema-derived enums: JobState=11 EventType=6 PrimitiveKind=6 PassKind=7 AssetPurpose=6
+ * // schema-derived enums: JobState=11 EventType=6 PrimitiveKind=6 PassKind=7 AssetPurpose=6 JobStatusBranches=11 JobEventBranches=6
  */
 
 export type SchemaVersion = "1.0.0";
@@ -166,6 +166,7 @@ export interface JobStatusBase {
 /**
  * State-discriminated JobStatus. SUCCEEDED requires manifestId; FAILED requires
  * error; CANCELLED requires cancelRequested=true; active states forbid terminal fields.
+ * Branches are derived from job-status.schema.json allOf rules at generation time.
  */
 export type JobStatus =
   | (JobStatusBase & {
@@ -215,6 +216,7 @@ export type JobStatus =
 
 /**
  * Type-discriminated JobEvent payloads.
+ * Variants are derived from job-event.schema.json; prohibited fields are `never`.
  */
 export type JobEvent =
   | {

@@ -126,6 +126,10 @@ async function main() {
     "reordered-passes",
     "status-created-with-manifest",
     "duplicate-sequence",
+    "state-changed-with-progress",
+    "state-changed-with-error",
+    "state-changed-with-asset-ref",
+    "state-changed-with-manifest-id",
   ];
   for (const fragment of requiredInvalidSubstrings) {
     if (!invalidFiles.some((name) => name.includes(fragment))) {

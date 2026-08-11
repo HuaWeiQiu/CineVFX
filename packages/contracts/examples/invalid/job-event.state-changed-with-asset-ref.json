@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "eventId": "evt_job_mock_bad_sc_asset",
+  "jobId": "job_mock_bad",
+  "sequence": 4,
+  "type": "state_changed",
+  "state": "RENDERING",
+  "timestamp": "2026-08-12T10:00:04Z",
+  "assetRef": {
+    "assetId": "asset_pass_rgba",
+    "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  }
+}
