@@ -1,0 +1,38 @@
+{
+  "name": "@cinevfx/photoshop-uxp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Photoshop 2026 UXP development shell for CineVFX Mock vertical slice",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/public-api.d.mts",
+      "import": "./src/public-api.mjs"
+    },
+    "./client": {
+      "types": "./src/client/http-client.d.mts",
+      "import": "./src/client/http-client.mjs"
+    }
+  },
+  "files": [
+    "src",
+    "manifest.json",
+    "index.html",
+    "index.js",
+    "styles.css",
+    "README.md",
+    "dist"
+  ],
+  "scripts": {
+    "check": "node scripts/check.mjs && tsc -p tsconfig.types.json",
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

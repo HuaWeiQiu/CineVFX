@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CineVFX</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app" class="panel" data-theme="ps-dark">
+      <header class="panel__header">
+        <div class="panel__title-row">
+          <h1 class="panel__title">CineVFX</h1>
+          <span id="task-state-badge" class="badge badge--idle" aria-live="polite">idle</span>
+        </div>
+        <p class="panel__subtitle">Layered effects workflow</p>
+      </header>
+
+      <section class="panel__section" aria-label="Connection">
+        <label class="field">
+          <span class="field__label">Mock API base URL</span>
+          <input
+            id="base-url"
+            class="field__input"
+            type="text"
+            value="https://localhost:8787"
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </label>
+        <label class="field">
+          <span class="field__label">Effect label</span>
+          <input
+            id="effect-label"
+            class="field__input"
+            type="text"
+            value="golden-magic-benchmark"
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </label>
+      </section>
+
+      <section class="panel__section panel__section--actions" aria-label="Actions">
+        <button id="btn-plan-proxy" class="btn btn--secondary" type="button">
+          Plan proxy
+        </button>
+        <button id="btn-submit" class="btn btn--primary" type="button">
+          Submit job
+        </button>
+        <button id="btn-cancel" class="btn btn--ghost" type="button" disabled>
+          Cancel
+        </button>
+        <button id="btn-import" class="btn btn--secondary" type="button" disabled>
+          Plan import
+        </button>
+      </section>
+
+      <section class="panel__section" aria-label="Progress">
+        <div class="progress">
+          <div class="progress__track">
+            <div id="progress-bar" class="progress__bar" style="width: 0%"></div>
+          </div>
+          <div class="progress__meta">
+            <span id="progress-stage">ready</span>
+            <span id="progress-ratio">0%</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel__section" aria-label="Status log">
+        <pre id="status-log" class="log" role="log" aria-live="polite"></pre>
+      </section>
+
+    </div>
+    <script src="index.js" type="module"></script>
+  </body>
+</html>
