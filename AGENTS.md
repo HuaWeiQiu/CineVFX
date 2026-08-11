@@ -32,7 +32,22 @@ particles, and lens effects are examples, not hard-coded product modes.
 - Workers may only edit declared owned paths in their isolated worktree.
 - Deterministic checks can veto any Agent verdict.
 - Implementers cannot approve their own work; reviewer and tester stay read-only.
-- Keep commits small, recoverable, and independently reviewable.
+- The Agent Team task lifecycle is worker changes, deterministic quality gates,
+  staged-diff review/test, then a controller-owned commit. Workers must not commit.
+- An unchanged `HEAD` and an uncommitted staged task diff are expected before
+  approval. Reviewer and tester must not request changes only because a task
+  commit or commit SHA does not exist yet.
+- Review remains strict for correctness, security, data loss, architecture,
+  acceptance coverage, test weakening, failed deterministic commands, missing
+  or empty diffs, out-of-scope paths, and internally inconsistent evidence.
+- Read-only specialists evaluate controller-recorded command results. Any
+  independent probe must itself be read-only; inability to rerun a command that
+  intentionally writes generated output is not by itself a product failure.
+- Tests labeled read-only must not write temporary files or generated output.
+- Do not claim TypeScript compilation unless a project-pinned compiler actually
+  runs. Schema/declaration parity is the accepted evidence until then.
+- Controller-created commits must remain small, recoverable, and independently
+  reviewable.
 
 ## Baseline Commands
 
