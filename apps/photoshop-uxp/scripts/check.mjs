@@ -5,7 +5,7 @@
 
 import { access, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Script } from "node:vm";
 import { bundleClassicEntry } from "./bundle-classic.mjs";
 import { validateUxpManifest } from "./validate-uxp-manifest.mjs";
@@ -115,7 +115,7 @@ if (
 }
 
 // Smoke-import public API.
-const api = await import(join(root, "src/public-api.mjs"));
+const api = await import(pathToFileURL(join(root, "src/public-api.mjs")).href);
 for (const key of [
   "createCinevfxClient",
   "createTaskController",
