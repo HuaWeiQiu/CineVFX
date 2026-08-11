@@ -1,0 +1,168 @@
+version: 1
+
+project:
+  name: cinevfx
+  defaultBranch: main
+  stateDirectory: .agent-team
+  maxParallel: 2
+
+profiles:
+  codex-orchestrator:
+    adapter: codex
+    model: gpt-5.6-sol
+    reasoning: max
+    permission: read-only
+    externalTools: deny
+    codexProvider:
+      id: sub2api
+      baseUrl: https://sub2api.ktyun.cc
+      wireApi: responses
+      requiresOpenAIAuth: true
+      supportsWebSockets: false
+    timeoutSeconds: 1800
+
+  codex-architect:
+    adapter: codex
+    model: gpt-5.6-sol
+    reasoning: xhigh
+    permission: read-only
+    externalTools: deny
+    codexProvider:
+      id: sub2api
+      baseUrl: https://sub2api.ktyun.cc
+      wireApi: responses
+      requiresOpenAIAuth: true
+      supportsWebSockets: false
+    timeoutSeconds: 1800
+
+  grok-worker:
+    adapter: grok
+    model: grok
+    reasoning: high
+    permission: workspace-write
+    externalTools: deny
+    maxTurns: 16
+    timeoutSeconds: 3600
+
+  codex-reviewer:
+    adapter: codex
+    model: gpt-5.6-sol
+    reasoning: xhigh
+    permission: read-only
+    externalTools: deny
+    codexProvider:
+      id: sub2api
+      baseUrl: https://sub2api.ktyun.cc
+      wireApi: responses
+      requiresOpenAIAuth: true
+      supportsWebSockets: false
+    timeoutSeconds: 1800
+
+  codex-tester:
+    adapter: codex
+    model: gpt-5.6-sol
+    reasoning: high
+    permission: read-only
+    externalTools: deny
+    codexProvider:
+      id: sub2api
+      baseUrl: https://sub2api.ktyun.cc
+      wireApi: responses
+      requiresOpenAIAuth: true
+      supportsWebSockets: false
+    timeoutSeconds: 1200
+
+roles:
+  orchestrator:
+    defaultProfile: codex-orchestrator
+    allowedProfiles: [codex-orchestrator]
+  architect:
+    defaultProfile: codex-architect
+    allowedProfiles: [codex-architect]
+  worker:
+    defaultProfile: grok-worker
+    allowedProfiles: [grok-worker]
+  reviewer:
+    defaultProfile: codex-reviewer
+    allowedProfiles: [codex-reviewer]
+  tester:
+    defaultProfile: codex-tester
+    allowedProfiles: [codex-tester]
+
+strategies:
+  default: contract-first
+  definitions:
+    contract-first:
+      topology:
+        mode: sequential
+      maxParallel: 1
+      maxReworkAttempts: 2
+      executionTimeoutSeconds: 43200
+      maxAgentInvocations: 48
+      maxProcessOutputBytes: 1048576
+      maxArtifactBytes: 1073741824
+      approvalGates: [plan, final]
+      approvalTimeoutSeconds: 172800
+      roleProfiles:
+        orchestrator: codex-orchestrator
+        architect: codex-architect
+        worker: grok-worker
+        reviewer: codex-reviewer
+        tester: codex-tester
+
+    mock-slice:
+      topology:
+        mode: parallel-dag
+      maxParallel: 2
+      maxReworkAttempts: 1
+      executionTimeoutSeconds: 43200
+      maxAgentInvocations: 64
+      maxProcessOutputBytes: 1048576
+      maxArtifactBytes: 2147483648
+      approvalGates: [plan, final]
+      approvalTimeoutSeconds: 172800
+      roleProfiles:
+        orchestrator: codex-orchestrator
+        architect: codex-architect
+        worker: grok-worker
+        reviewer: codex-reviewer
+        tester: codex-tester
+
+observability:
+  maxEventsPerRun: 50000
+
+evolution:
+  automatic:
+    enabled: false
+    autoStart: false
+    maxCycles: 3
+    maxConsecutiveNoImprovement: 2
+    evaluationRepeats: 1
+    minimumScoreDelta: 1
+    proposerRole: orchestrator
+    proposerProfile: codex-orchestrator
+    baselineStrategy: contract-first
+    targetStrategy: auto-evolved
+    evaluationGoal: ""
+
+quality:
+  commands:
+    - command: pnpm
+      args: [check]
+    - command: pnpm
+      args: [test]
+    - command: pnpm
+      args: [build]
+  maxReworkAttempts: 1
+  commandTimeoutSeconds: 900
+
+github:
+  enabled: false
+  remote: origin
+  draftPullRequest: true
+  autoMerge: false
+  checkTimeoutSeconds: 1800
+  maxRepairAttempts: 1
+  repairForbiddenPaths:
+    - .github/workflows/**
+    - agent-team.yaml

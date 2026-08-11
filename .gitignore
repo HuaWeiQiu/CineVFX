@@ -1,0 +1,9 @@
+.agent-team/
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
+__pycache__/
+.pytest_cache/
+.venv/

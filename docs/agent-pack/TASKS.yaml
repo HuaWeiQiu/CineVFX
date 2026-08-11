@@ -1,0 +1,33 @@
+version: 1
+phase: P0-P1
+tasks:
+  - id: C00
+    title: Freeze shared contracts and examples
+    dependsOn: []
+    ownedPaths:
+      - packages/contracts/**
+      - docs/contracts/**
+      - openapi/**
+    exit: JSON Schema examples and OpenAPI validate deterministically
+
+  - id: C01
+    title: Implement Mock job and asset API
+    dependsOn: [C00]
+    ownedPaths:
+      - apps/api-server/**
+    exit: asset, job, event, cancel, and manifest tests pass
+
+  - id: C02
+    title: Implement Photoshop UXP shell and typed client
+    dependsOn: [C00]
+    ownedPaths:
+      - apps/photoshop-uxp/**
+    exit: panel state, client, manifest validation, and import-plan tests pass
+
+  - id: C03
+    title: Prove the Mock vertical slice
+    dependsOn: [C01, C02]
+    ownedPaths:
+      - tests/integration/**
+      - fixtures/**
+    exit: fixed proxy-to-manifest-to-import-plan flow passes with cancellation cases
