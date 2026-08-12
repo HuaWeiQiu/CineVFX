@@ -214,4 +214,18 @@ describe("planManifestImport", () => {
     const planned = await guard.planModalTransaction(async () => "ok");
     assert.equal(planned.result, "ok");
   });
+
+  it("keeps runInsideWrites and planModalTransaction mutually exclusive", async () => {
+    const guard = createWriteScopeGuard();
+    await guard.runInsideWrites(async () => {
+      assert.equal(guard.getScope(), "inside_modal");
+      await assert.rejects(
+        () => guard.planModalTransaction(async () => true),
+        /already active/,
+      );
+    });
+    assert.equal(guard.getScope(), "outside");
+    const planned = await guard.planModalTransaction(async () => "ok");
+    assert.equal(planned.result, "ok");
+  });
 });

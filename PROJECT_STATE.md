@@ -4,7 +4,7 @@
 
 - Phase: Stage 5 development-preview delivery handoff
 - Delivery state: Stages 1-4 complete in Node; documentation and development packaging ready
-- Photoshop state: UXP Manifest v5 development shell only; host execution remains unverified
+- Photoshop state: local glow creation/undo/redo verified on macOS Photoshop 27.9.1; wider acceptance in progress
 - Last updated: 2026-08-12
 
 ## Completed And Verified
@@ -16,7 +16,8 @@
    logging. API tests: `59/59`.
 3. **UXP shell**: Photoshop 2026 / 27.x-oriented Manifest v5 panel, typed HTTP
    client, task state, proxy/export planning, manifest validation, and
-   rollback-safe import planning. UXP Node tests: `130/130`; project-pinned
+   rollback-safe import planning, plus a bounded active-layer local glow host.
+   UXP Node tests: `156/156`; project-pinned
    TypeScript compilation passed.
 4. **Integration**: public UXP client and workflow crossed the real Node
    loopback socket through `/healthz`, `X-CineVFX-Session`, and all required
@@ -28,6 +29,12 @@
 
 All package/root `check`, `test`, and `build` gates passed for the 2026-08-12
 delivery snapshot. This evidence is Node-only unless stated otherwise.
+
+The local glow path was also exercised in macOS Photoshop 2026 / 27.9.1 on an
+853 x 1280 RGB 8-bit background layer. It created `CineVFX 发光` above the
+source with `柔光扩散` and `发光边缘`; one undo removed the complete group and
+redo restored it. The source layer remained present, but pixel-level source
+identity was not measured.
 
 ## Frozen Decisions
 
@@ -45,12 +52,12 @@ delivery snapshot. This evidence is Node-only unless stated otherwise.
 
 ## Unverified
 
-- Real active-document and selected-layer capture in Photoshop
+- Cross-platform acceptance of active-document and selected-layer capture
 - Photoshop pixel readback and proxy/mask/effect-reference export
-- Real layer placement, `executeAsModal`, suspended history, undo, and rollback
+- Windows and failure-injection acceptance of local glow placement/history/rollback
 - Runtime proof that protected source pixels and geometry remain unchanged
 - HTTPS certificate trust and UXP networking inside Photoshop 2026
-- Photoshop runtime behavior on Windows and macOS
+- Wider Photoshop runtime behavior beyond the checked macOS local-glow path
 - Signed CCX packaging, marketplace plugin id, review, and compatibility
 - Persistence, multi-user authentication, production deployment, and rate limiting
 - Procedural renderer, AI/model providers, model/weight licenses, and GPU behavior
@@ -58,9 +65,8 @@ delivery snapshot. This evidence is Node-only unless stated otherwise.
 
 ## Next Gate
 
-Run the manual Photoshop 2026 acceptance matrix on Windows and macOS: load the
-unpacked development build with UXP Developer Tool, verify HTTPS trust and API
-connectivity, replace fixed demo metadata with real active-document export,
-execute the bounded import through `executeAsModal`, inspect the layer stack,
-verify one-step undo/rollback, and compare protected-source pixels and geometry
+Continue the manual Photoshop 2026 acceptance matrix: repeat local glow on
+Windows and failure/cancel cases, load the unpacked build with UXP Developer
+Tool, verify HTTPS trust and API connectivity, replace fixed Mock metadata with
+real active-document export, and compare protected-source pixels and geometry
 before considering a signed CCX or marketplace release.

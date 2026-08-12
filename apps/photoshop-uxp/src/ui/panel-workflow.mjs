@@ -90,7 +90,6 @@ export function createPanelWorkflow(deps) {
     deps.task.beginProxyPlanning(plan);
     log("Proxy plan created (metadata only)", {
       assets: plan.plannedAssets.length,
-      effectLabel: plan.effectLabel,
     });
     deps.task.finishProxyPlanning();
     return plan;

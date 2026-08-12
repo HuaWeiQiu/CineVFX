@@ -14,6 +14,12 @@ export {
   createWriteScopeGuard,
   assertNetworkOutsideWrites,
 } from "./safety/network-boundary.mjs";
+export { GlowPlanError, planGlowEffect } from "./effects/glow-plan.mjs";
+export { createLocalGlowService } from "./effects/local-glow-service.mjs";
+export {
+  GlowHostError,
+  createPhotoshopGlowHost,
+} from "./host/photoshop-glow-host.mjs";
 export {
   redactValue,
   redactString,

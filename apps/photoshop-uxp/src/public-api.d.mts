@@ -124,6 +124,9 @@ export interface WriteScopeGuard {
   assertNetworkAllowed(): void;
   isNetworkActive(): boolean;
   runOutsideWrites<T>(operation: () => Promise<T> | T): Promise<T>;
+  runInsideWrites<T>(operation: (context: {
+    assertNoNetwork(): never;
+  }) => Promise<T> | T): Promise<T>;
   planModalTransaction<T>(operation: (context: {
     assertNoNetwork(): never;
   }) => Promise<T> | T): Promise<{
@@ -134,6 +137,108 @@ export interface WriteScopeGuard {
 
 export function createWriteScopeGuard(): WriteScopeGuard;
 export function assertNetworkOutsideWrites(plan: unknown): true;
+
+export interface GlowContext {
+  documentId: number;
+  sourceLayerId: number;
+  documentMode: "rgb";
+  bitsPerChannel: 8 | 16;
+  layerKind: "pixel" | "smartObject";
+  visible: true;
+  bounds: { x: number; y: number; width: number; height: number };
+  sourceSnapshot: { documentId: number; sourceLayerId: number };
+}
+
+export interface GlowSettings {
+  recipeId?: "soft_glow";
+  color: string;
+  intensity: number;
+  size: number;
+  blur: number;
+  blendMode: "screen" | "linearDodge";
+}
+
+export interface GlowPlan {
+  readonly kind: "local_glow_plan";
+  readonly recipeId: "soft_glow";
+  readonly source: Readonly<GlowContext & {
+    immutable: true;
+    operationsForbidden: readonly string[];
+  }>;
+  readonly settings: Readonly<GlowSettings & {
+    recipeId?: never;
+    rgb: { red: number; green: number; blue: number };
+    outerOpacity: number;
+    bloomOpacity: number;
+  }>;
+  readonly names: Readonly<{ group: string; edge: string; bloom: string }>;
+  readonly transaction: Readonly<{
+    mode: "single_history_state";
+    historyName: string;
+    rollbackOnAnyFailure: true;
+    noPartialGroup: true;
+    allowsNetwork: false;
+  }>;
+  readonly memory: Readonly<{
+    pixelWidth: number;
+    pixelHeight: number;
+    pixelCount: number;
+    estimatedPeakBytes: number;
+    hardLimitBytes: number;
+    surfaces: number;
+    componentsPerPixel: number;
+    bytesPerComponent: number;
+    calculatedWith: "bigint";
+  }>;
+}
+
+export function planGlowEffect(
+  context: GlowContext,
+  settings: GlowSettings,
+): GlowPlan;
+
+export class GlowPlanError extends Error {
+  constructor(code: string);
+  readonly code: string;
+}
+
+export interface GlowHostResult {
+  committed: true;
+  documentId: number;
+  sourceLayerId: number;
+  groupLayerId: number;
+  edgeLayerId: number;
+  bloomLayerId: number;
+}
+
+export interface PhotoshopGlowHost {
+  inspectActiveContext(): GlowContext;
+  inspectSelectedLayer(): GlowContext;
+  applyGlow(plan: GlowPlan): Promise<GlowHostResult>;
+}
+
+export class GlowHostError extends Error {
+  constructor(code: string, stage: string);
+  readonly code: string;
+  readonly stage: string;
+}
+
+export function createPhotoshopGlowHost(options?: {
+  loadPhotoshop?: () => unknown;
+}): PhotoshopGlowHost;
+
+export interface LocalGlowService {
+  inspect(): Promise<Readonly<GlowPlan["source"]>>;
+  apply(settings: GlowSettings): Promise<Readonly<{
+    plan: GlowPlan;
+    hostResult: GlowHostResult | null;
+  }>>;
+}
+
+export function createLocalGlowService(dependencies: {
+  host: PhotoshopGlowHost;
+  writeGuard: WriteScopeGuard;
+}): LocalGlowService;
 
 export function redactValue(value: unknown, depth?: number): unknown;
 export function redactString(text: string): string;

@@ -21,16 +21,21 @@ The following are **explicitly UNVERIFIED** in this development shell:
 | Capability | Status |
 | --- | --- |
 | Real Photoshop proxy export / pixel readback | **UNVERIFIED** |
-| `executeAsModal` / history / undo execution | **UNVERIFIED** |
-| Layer placement into the document | **UNVERIFIED** |
+| Local glow `executeAsModal` / history / undo | **VERIFIED on macOS Photoshop 27.9.1** |
+| Local glow layer placement | **VERIFIED on macOS Photoshop 27.9.1** |
 | Runtime source preservation | **UNVERIFIED** |
 | Windows runtime | **UNVERIFIED** |
 | One-click signed installation | **UNVERIFIED** |
 | Real marketplace plugin ID | **UNVERIFIED** (uses `com.cinevfx.dev.shell`) |
 | Marketplace compatibility | **UNVERIFIED** |
-| End-to-end runtime success in Photoshop | **UNVERIFIED** |
+| Wider end-to-end runtime success | **UNVERIFIED** |
 
 Bounds metadata is **not** proof of subject preservation.
+
+The macOS runtime check used an 853 x 1280 RGB 8-bit background layer. The
+plugin created `CineVFX 发光` with `柔光扩散` and `发光边缘`, one undo removed
+the complete result group, and redo restored it. This does not prove source
+pixel identity, Windows behavior, Mock networking, or real proxy/import paths.
 
 ## Package commands
 
@@ -105,22 +110,27 @@ the Photoshop UXP HTML entry loads a classic script. The generated
 
 ## Usage (panel)
 
-This phase is a deterministic development shell. Its visible buttons currently
-use fixed demo layer/document IDs and 1024 x 1024 metadata; they do **not** read
-the active Photoshop document, selected layer, pixels, or bounds.
+The **Local Effect** controls read the active Photoshop document, exactly one
+selected layer, bit depth, kind, and bounds. They do not read image bytes into
+JavaScript or send image data to the Mock API. The separate **Development test
+(Mock)** controls still use fixed demo IDs and metadata.
 
-1. Optionally edit the Mock API base URL and effect label (arbitrary labels are
+1. Select one visible pixel layer or smart object in an RGB 8/16-bit document.
+2. Set glow color, intensity, spread, and bloom radius, then choose **Create
+   soft glow**. CineVFX creates one editable group above the source with edge
+   glow and bloom derivatives. The source is only duplicated, never edited.
+3. Optionally edit the Mock API base URL and effect label (arbitrary labels are
    allowed; golden-magic is benchmark metadata only).
-2. **Plan proxy** — builds a metadata-only proxy plan for the fixed demo source
+4. **Plan proxy** — builds a metadata-only proxy plan for the fixed demo source
    (no Photoshop DOM or pixel export). Real active-layer capture remains
    **UNVERIFIED**.
-3. **Submit job** — registers planned asset metadata via `POST /v1/assets`,
+5. **Submit job** — registers planned asset metadata via `POST /v1/assets`,
    creates a job via `POST /v1/jobs`, polls job/events, then fetches and
    validates the Layer Manifest on success. All network waits run outside
    write/modal scope through `runOutsideWrites`.
-4. **Cancel** — sends idempotent `POST /v1/jobs/{id}/cancel` when a job is
+6. **Cancel** — sends idempotent `POST /v1/jobs/{id}/cancel` when a job is
    active (repeat cancels are accepted).
-5. **Plan import** — reuses the validated manifest (or fetches it), enforces
+7. **Plan import** — reuses the validated manifest (or fetches it), enforces
    frozen-schema validation, and builds a single-history, rollback-safe import
    plan that never mutates the protected source. Real `executeAsModal` /
    placement remains **UNVERIFIED**.

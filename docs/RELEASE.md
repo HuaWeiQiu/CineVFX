@@ -13,14 +13,16 @@ Included:
 - Metadata-only proxy and protected-source planning
 - Typed local Mock API client and task state
 - Layer Manifest validation and rollback-safe import planning
+- Local active-layer soft glow using a bounded `executeAsModal` history
+  transaction with rollback on failure
 - Generic effect-layer labels and contracts
 
 Not included or verified:
 
 - Real Photoshop pixel export/readback
-- Real layer placement, `executeAsModal`, history, undo, or rollback
+- Mock manifest import placement remains planning-only
 - Runtime proof of protected-source pixel/geometry preservation
-- Windows or macOS Photoshop runtime acceptance
+- Windows runtime and macOS runtime beyond the checked local-glow path
 - Signed CCX, marketplace publication, or production plugin id
 - AI/model providers, procedural rendering, native 8K, or quality guarantees
 
@@ -176,6 +178,8 @@ Manual Photoshop checklist, currently **UNVERIFIED**:
 
 - [ ] UDT loads the panel on macOS Photoshop 2026
 - [ ] UDT loads the panel on Windows Photoshop 2026
+- [x] Sideloaded local glow creates the expected two-layer group on macOS Photoshop 27.9.1
+- [x] One undo removes the complete local-glow group and redo restores it on macOS
 - [ ] HTTPS trust and `/healthz` session bootstrap work in both hosts
 - [ ] Real proxy export uses the active document/layer without moving it
 - [ ] Real import runs through bounded `executeAsModal`

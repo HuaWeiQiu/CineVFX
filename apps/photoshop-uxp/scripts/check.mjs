@@ -30,6 +30,9 @@ const requiredFiles = [
   "src/import/import-plan.mjs",
   "src/safety/network-boundary.mjs",
   "src/safety/data-snapshot.mjs",
+  "src/effects/glow-plan.mjs",
+  "src/effects/local-glow-service.mjs",
+  "src/host/photoshop-glow-host.mjs",
   "src/log/redact.mjs",
   "src/ui/panel-controller.mjs",
   "src/ui/panel-workflow.mjs",
@@ -123,6 +126,9 @@ for (const key of [
   "validateLayerManifest",
   "planManifestImport",
   "createWriteScopeGuard",
+  "planGlowEffect",
+  "createLocalGlowService",
+  "createPhotoshopGlowHost",
   "createPanelWorkflow",
   "MOCK_ENDPOINTS",
   "UNVERIFIED",
@@ -213,7 +219,13 @@ const html = await readFile(join(root, "index.html"), "utf8");
 if (!html.includes('href="styles.css"') || !html.includes('src="index.js"')) {
   throw new Error("index.html must load local styles.css and index.js");
 }
-if (!html.includes("btn-submit") || !html.includes("btn-cancel") || !html.includes("btn-import")) {
+if (
+  !html.includes("btn-create-glow") ||
+  !html.includes("btn-refresh-layer") ||
+  !html.includes("btn-submit") ||
+  !html.includes("btn-cancel") ||
+  !html.includes("btn-import")
+) {
   throw new Error("index.html must declare primary panel action buttons");
 }
 

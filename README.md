@@ -22,9 +22,12 @@ handoff documentation in this repository.
 This is a **development preview**, not a production Photoshop plugin:
 
 - The UXP shell builds a metadata-only proxy plan and import plan.
-- Real Photoshop pixel export/readback, layer placement, `executeAsModal`,
-  history/undo, and protected-source preservation are **UNVERIFIED**.
-- Photoshop 2026 runtime behavior on Windows and macOS is **UNVERIFIED**.
+- The local glow path was exercised in macOS Photoshop 2026 / 27.9.1: it
+  created the editable two-layer group above the source, one undo removed the
+  complete group, and redo restored it. Pixel-level source preservation,
+  proxy/import placement, and Windows runtime remain **UNVERIFIED**.
+- Real Photoshop pixel export/readback and Mock end-to-end networking remain
+  **UNVERIFIED**.
 - The plugin id `com.cinevfx.dev.shell` is a development id.
 - There is no signed CCX, marketplace package, or one-click formal installer.
 - No real AI provider, renderer, native 8K pipeline, or 8K quality claim is
@@ -49,7 +52,8 @@ Photoshop 2026 / UXP Developer Tool                Node Mock API
 | protected source remains input   |<--------------| GET validated manifest   |
 +----------------------------------+               +--------------------------+
                  |
-                 +-- Photoshop DOM export/import/executeAsModal: UNVERIFIED
+                 +-- local glow executeAsModal: macOS 27.9.1 runtime-checked
+                 +-- proxy export/import and pixel proof: UNVERIFIED
 ```
 
 The six frozen business routes are `POST /v1/assets`, `POST /v1/jobs`,
@@ -65,7 +69,7 @@ development.
 | --- | --- | --- |
 | 1. Contracts | Frozen JSON Schema, OpenAPI, examples, generated declarations, and state rules | Contract tests `20/20`; contract check/build passed |
 | 2. Mock API | Bounded assets/jobs/events/cancel/manifest service with idempotency and redacted logs | API tests `59/59`; API check/build passed |
-| 3. UXP shell | Manifest v5 panel, typed client, task state, proxy/import planning, and validation | UXP tests `130/130`; real project-pinned `tsc`, check, and build passed |
+| 3. UXP shell | Manifest v5 panel, typed client, task state, local glow host, proxy/import planning, and validation | UXP tests `156/156`; real project-pinned `tsc`, check, and build passed |
 | 4. Integration | Authenticated health/session transport and Mock workflow over real Node sockets | Root tests `6/6`, including four real-socket integration tests; root check/build passed |
 | 5. Delivery handoff | MIT license, current-state documentation, deterministic development ZIP/checksums and UDT instructions | Current root suite `14/14`, including four packaging tests; documentation and diff checks pass |
 

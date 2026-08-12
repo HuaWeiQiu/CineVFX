@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div id="app" class="panel" data-theme="ps-dark">
+    <main id="app" class="panel" data-theme="ps-dark">
       <header class="panel__header">
         <div class="panel__title-row">
           <h1 class="panel__title">CineVFX</h1>
@@ -16,7 +16,68 @@
         <p class="panel__subtitle">分层特效工作流（开发预览）</p>
       </header>
 
-      <section class="panel__section" aria-label="连接设置">
+      <section class="panel__section panel__section--local" aria-labelledby="local-effect-title">
+        <div class="section-heading">
+          <h2 id="local-effect-title" class="section-heading__title">本地效果</h2>
+          <span class="section-heading__note">非破坏性图层效果</span>
+        </div>
+
+        <div class="selection-row">
+          <div class="selection-row__copy">
+            <span class="field__label">当前图层</span>
+            <strong id="local-layer-status" class="selection-row__status" aria-live="polite">
+              正在读取...
+            </strong>
+            <span id="local-layer-meta" class="selection-row__meta">未读取安全元数据</span>
+          </div>
+          <button id="btn-refresh-layer" class="btn btn--compact" type="button">
+            刷新
+          </button>
+        </div>
+
+        <label class="field" for="glow-color">
+          <span class="field__label">发光颜色</span>
+          <input
+            id="glow-color"
+            class="field__input field__input--color-text"
+            type="text"
+            value="#FFD36A"
+            maxlength="7"
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </label>
+
+        <div class="range-field">
+          <label class="range-field__label" for="glow-intensity">强度</label>
+          <input id="glow-intensity" class="range-field__input" type="range" min="0" max="100" value="70" />
+          <output id="glow-intensity-value" class="range-field__value" for="glow-intensity">70%</output>
+        </div>
+
+        <div class="range-field">
+          <label class="range-field__label" for="glow-spread">发光范围</label>
+          <input id="glow-spread" class="range-field__input" type="range" min="1" max="250" value="36" />
+          <output id="glow-spread-value" class="range-field__value" for="glow-spread">36 px</output>
+        </div>
+
+        <div class="range-field">
+          <label class="range-field__label" for="glow-blur-radius">柔光半径</label>
+          <input id="glow-blur-radius" class="range-field__input" type="range" min="1" max="250" value="18" />
+          <output id="glow-blur-radius-value" class="range-field__value" for="glow-blur-radius">18 px</output>
+        </div>
+
+        <button id="btn-create-glow" class="btn btn--primary btn--wide" type="button" disabled>
+          创建柔和发光
+        </button>
+        <p id="local-glow-status" class="local-status" role="status" aria-live="polite">
+          正在检查当前图层
+        </p>
+      </section>
+
+      <section class="panel__section panel__section--mock" aria-labelledby="mock-title">
+        <div class="section-heading">
+          <h2 id="mock-title" class="section-heading__title">开发测试（Mock）</h2>
+        </div>
         <label class="field">
           <span class="field__label">本地服务地址</span>
           <input
@@ -39,9 +100,7 @@
             autocomplete="off"
           />
         </label>
-      </section>
-
-      <section class="panel__section panel__section--actions" aria-label="操作">
+        <div class="panel__section panel__section--actions" aria-label="Mock 操作">
         <button id="btn-plan-proxy" class="btn btn--secondary" type="button">
           规划代理图
         </button>
@@ -54,9 +113,9 @@
         <button id="btn-import" class="btn btn--secondary" type="button" disabled>
           规划导入
         </button>
-      </section>
+        </div>
 
-      <section class="panel__section" aria-label="进度">
+        <div class="panel__section" aria-label="进度">
         <div class="progress">
           <div class="progress__track">
             <div id="progress-bar" class="progress__bar" style="width: 0%"></div>
@@ -66,13 +125,13 @@
             <span id="progress-ratio">0%</span>
           </div>
         </div>
-      </section>
+        </div>
 
-      <section class="panel__section" aria-label="运行日志">
+        <div class="panel__section" aria-label="运行日志">
         <pre id="status-log" class="log" role="log" aria-live="polite"></pre>
+        </div>
       </section>
-
-    </div>
+    </main>
     <script src="index.js" type="module"></script>
   </body>
 </html>

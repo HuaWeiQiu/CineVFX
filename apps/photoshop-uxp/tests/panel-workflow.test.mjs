@@ -235,6 +235,22 @@ describe("panel workflow", () => {
     }
   });
 
+  it("never writes the caller effect label into workflow logs", () => {
+    const marker = "private-client-project-marker";
+    const lines = [];
+    const workflow = createPanelWorkflow({
+      task: createTaskController(),
+      writeGuard: createWriteScopeGuard(),
+      log(message, fields) {
+        lines.push(JSON.stringify({ message, fields }));
+      },
+    });
+
+    workflow.planProxy(protectedSource, { effectLabel: marker });
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].includes(marker), false);
+  });
+
   it("preserves a completed task when a new proxy plan is invalid", async () => {
     const task = createTaskController();
     task.beginSubmit({ effectLabel: "completed" });

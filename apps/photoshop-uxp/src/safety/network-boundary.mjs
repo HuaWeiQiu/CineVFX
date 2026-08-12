@@ -13,6 +13,7 @@
  *   getScope: () => WriteScope,
  *   isNetworkActive: () => boolean,
  *   runOutsideWrites: <T>(fn: () => Promise<T> | T) => Promise<T>,
+ *   runInsideWrites: <T>(fn: (ctx: { assertNoNetwork: () => void }) => Promise<T> | T) => Promise<T>,
  *   planModalTransaction: <T>(fn: (ctx: { assertNoNetwork: () => void }) => Promise<T> | T) => Promise<{ planned: true, result: T }>,
  *   assertNetworkAllowed: () => void,
  * }}
@@ -60,6 +61,30 @@ export function createWriteScopeGuard() {
     },
 
     /**
+     * Run one bounded Photoshop write transaction. The callback is an adapter
+     * boundary; the real host is responsible for executeAsModal/history.
+     * @template T
+     * @param {(ctx: { assertNoNetwork: () => void }) => Promise<T> | T} fn
+     * @returns {Promise<T>}
+     */
+    async runInsideWrites(fn) {
+      if (scope !== "outside") {
+        throw new Error("write transaction already active");
+      }
+      if (activeNetworkPhases > 0) {
+        throw new Error(
+          "write transaction forbidden while a network wait is active",
+        );
+      }
+      scope = "inside_modal";
+      try {
+        return await fn({ assertNoNetwork: rejectNetworkInsideWrites });
+      } finally {
+        scope = "outside";
+      }
+    },
+
+    /**
      * Plan a single bounded modal transaction. Does not call Photoshop APIs.
      * Network is rejected while the plan callback runs, and while any network
      * phase started via runOutsideWrites is still outstanding.
@@ -92,6 +117,12 @@ export function createWriteScopeGuard() {
       }
     },
   };
+
+  function rejectNetworkInsideWrites() {
+    throw new Error(
+      "network waits are forbidden inside a Photoshop write/modal plan",
+    );
+  }
 }
 
 /**
