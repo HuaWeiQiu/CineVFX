@@ -28,10 +28,11 @@ fixes, retesting, and rereview before controller integration.
 
 - Contract package: `20/20` tests plus check/build.
 - Mock API: `59/59` tests plus check/build.
-- UXP shell: `130/130` Node tests plus project-pinned `tsc`, check/build.
+- UXP shell: `156/156` Node tests plus project-pinned `tsc`, check/build.
 - Stage 4 root slice: `6/6` tests, including four real Node socket integration tests.
-- Current Stage 5 root suite: `14/14`, adding four deterministic release
-  packaging tests and four cross-platform command-runner tests.
+- Current Stage 5 root suite: `15/15`, adding four deterministic release
+  packaging tests, four cross-platform command-runner tests, and one Chinese
+  handoff contract test.
 - Root/package check and build gates passed.
 - Staged changes: `git diff --cached --check` before handoff.
 

@@ -24,8 +24,9 @@
    job paths. Root tests: `6/6`, including four real-socket integration tests.
 5. **Delivery handoff**: MIT licensing, architecture/status truth, deterministic
    development ZIP/checksum tooling, certificate guidance, and Windows/macOS
-   sideload boundaries are documented. The current root suite is `14/14`,
-   including four release packaging and four command-runner tests.
+   sideload boundaries are documented. The current root suite is `15/15`,
+   including four release packaging, four command-runner, and one handoff
+   contract test.
 
 All package/root `check`, `test`, and `build` gates passed for the 2026-08-12
 delivery snapshot. This evidence is Node-only unless stated otherwise.
@@ -70,3 +71,6 @@ Windows and failure/cancel cases, load the unpacked build with UXP Developer
 Tool, verify HTTPS trust and API connectivity, replace fixed Mock metadata with
 real active-document export, and compare protected-source pixels and geometry
 before considering a signed CCX or marketplace release.
+
+The current Chinese implementation handoff is
+[`docs/HANDOFF.zh-CN.md`](docs/HANDOFF.zh-CN.md).

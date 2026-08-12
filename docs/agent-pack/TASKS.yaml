@@ -67,7 +67,8 @@ tasks:
     evidence:
       - MIT license added
       - deterministic ZIP, release manifest, and SHA-256 tooling covered by four tests
-      - current root suite 14/14
+      - current root suite 15/15
+      - Chinese implementation handoff guarded by a root contract test
       - certificate, Windows, and UDT instructions documented
       - documentation links, facts, and working diff checked
     exit: handoff states verified Node scope and all unverified Photoshop/release boundaries

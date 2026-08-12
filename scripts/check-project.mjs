@@ -13,6 +13,7 @@ const requiredFiles = [
   "docs/agent-pack/06_API_DATA_CONTRACTS.md",
   "docs/agent-pack/07_MULTI_AGENT_TEAM.md",
   "docs/agent-pack/TASKS.yaml",
+  "docs/HANDOFF.zh-CN.md",
   "docs/RELEASE.md",
   "apps/photoshop-uxp/scripts/plugin-artifact.mjs",
   "scripts/package-release.mjs",
@@ -37,6 +38,19 @@ if (!requirements.includes("protected source")) {
 const state = await readFile("PROJECT_STATE.md", "utf8");
 if (!state.includes("Unverified")) {
   throw new Error("PROJECT_STATE.md must track unverified work");
+}
+
+const handoff = await readFile("docs/HANDOFF.zh-CN.md", "utf8");
+for (const requiredToken of [
+  "https://github.com/HuaWeiQiu/CineVFX",
+  "通过 UXP Developer Tool 加载",
+  "实机验收记录",
+  "不可破坏的工程约束",
+  "下一阶段建议",
+]) {
+  if (!handoff.includes(requiredToken)) {
+    throw new Error(`Chinese handoff must include ${requiredToken}`);
+  }
 }
 
 const license = await readFile("LICENSE", "utf8");

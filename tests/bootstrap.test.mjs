@@ -19,3 +19,13 @@ test("source preservation is stronger than a bounds-only check", async () => {
   assert.match(guidance, /Never modify, move, transform, resize, or replace/i);
   assert.match(guidance, /Do not claim absolute subject preservation from layer bounds alone/i);
 });
+
+test("Chinese handoff keeps install, evidence, boundaries, and next work together", async () => {
+  const handoff = await readFile("docs/HANDOFF.zh-CN.md", "utf8");
+  assert.match(handoff, /github\.com\/HuaWeiQiu\/CineVFX/);
+  assert.match(handoff, /通过 UXP Developer Tool 加载/);
+  assert.match(handoff, /实机验收记录/);
+  assert.match(handoff, /不可破坏的工程约束/);
+  assert.match(handoff, /下一阶段建议/);
+  assert.match(handoff, /Windows Photoshop[\s\S]*未验证/);
+});

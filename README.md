@@ -35,6 +35,9 @@ This is a **development preview**, not a production Photoshop plugin:
 
 See [Project State](PROJECT_STATE.md) for the evidence boundary and
 [Release Guide](docs/RELEASE.md) for development packaging and sideloading.
+The Chinese [Project Handoff](docs/HANDOFF.zh-CN.md) is the quickest entry point
+for installation, architecture, runtime evidence, troubleshooting, and the
+next implementation stages.
 
 ## Architecture
 
@@ -71,7 +74,7 @@ development.
 | 2. Mock API | Bounded assets/jobs/events/cancel/manifest service with idempotency and redacted logs | API tests `59/59`; API check/build passed |
 | 3. UXP shell | Manifest v5 panel, typed client, task state, local glow host, proxy/import planning, and validation | UXP tests `156/156`; real project-pinned `tsc`, check, and build passed |
 | 4. Integration | Authenticated health/session transport and Mock workflow over real Node sockets | Root tests `6/6`, including four real-socket integration tests; root check/build passed |
-| 5. Delivery handoff | MIT license, current-state documentation, deterministic development ZIP/checksums and UDT instructions | Current root suite `14/14`, including four packaging tests; documentation and diff checks pass |
+| 5. Delivery handoff | MIT license, current-state documentation, deterministic development ZIP/checksums and UDT instructions | Current root suite `15/15`, including four packaging tests and the handoff contract test; documentation and diff checks pass |
 
 Counts are the 2026-08-12 delivery snapshot. Automated tests do not substitute
 for the Photoshop acceptance work listed in [Project State](PROJECT_STATE.md).
