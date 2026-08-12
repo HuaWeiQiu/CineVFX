@@ -9,6 +9,57 @@ import { formatSafeLog } from "../log/redact.mjs";
 const MAX_PANEL_LOG_LINES = 200;
 const MAX_STAGE_TEXT_LENGTH = 128;
 
+const STATE_LABELS = Object.freeze({
+  [TASK_STATES.IDLE]: "空闲",
+  [TASK_STATES.PLANNING_PROXY]: "正在规划",
+  [TASK_STATES.SUBMITTING]: "正在提交",
+  [TASK_STATES.POLLING]: "处理中",
+  [TASK_STATES.SUCCEEDED]: "已完成",
+  [TASK_STATES.FAILED]: "失败",
+  [TASK_STATES.CANCELLED]: "已取消",
+  [TASK_STATES.IMPORT_PLANNED]: "已规划导入",
+});
+
+const STAGE_LABELS = Object.freeze({
+  ready: "就绪",
+  submit: "正在提交",
+  created: "已创建",
+  validating: "正在校验",
+  queued: "已排队",
+  preprocessing: "预处理中",
+  render: "渲染中",
+  rendering: "渲染中",
+  postprocessing: "后处理中",
+  exporting: "导出中",
+  done: "完成",
+  succeeded: "已完成",
+  failed: "失败",
+  cancelled: "已取消",
+});
+
+const LOG_MESSAGE_LABELS = Object.freeze({
+  "Proxy plan created (metadata only)": "代理图方案已创建（仅元数据）",
+  "Fetching manifest": "正在获取图层清单",
+  "Manifest identity/binding failed": "图层清单身份校验失败",
+  "Job succeeded; manifest validated": "任务已完成，图层清单校验通过",
+  "Network phase (outside writes)": "正在访问本地服务",
+  "Submit aborted before job create": "任务创建前已取消提交",
+  "Job created": "任务已创建",
+  "Cancel after abort failed": "提交中止后的取消操作失败",
+  "Submit aborted": "提交已取消",
+  "Submit failed": "任务提交失败",
+  "Cancel ignored after server-confirmed success": "任务已完成，忽略取消操作",
+  "Cancel requested (no job id yet; will abort submit if in flight)":
+    "已请求取消，正在中止提交",
+  "Cancel requested during active network phase": "已请求取消当前网络任务",
+  "Import planning failed: unstable input": "导入规划失败：输入不稳定",
+  "Import planning failed": "导入规划失败",
+  "Import plan ready (execution UNVERIFIED)": "导入方案已就绪（尚未执行）",
+  "Cancel reconciled": "取消状态已同步",
+  "Cancel raced with success; manifest validated":
+    "取消时任务已完成，图层清单校验通过",
+});
+
 /**
  * @param {ReturnType<import('../task/task-state.mjs').createTaskController>} task
  * @param {{
@@ -24,7 +75,7 @@ export function createPanelController(task, options = {}) {
   const logLines = [];
 
   function appendLog(message, fields) {
-    const line = formatSafeLog(message, fields);
+    const line = formatSafeLog(localizeLogMessage(message), fields);
     logLines.push(line);
     if (logLines.length > MAX_PANEL_LOG_LINES) {
       logLines.splice(0, logLines.length - MAX_PANEL_LOG_LINES);
@@ -44,7 +95,7 @@ export function createPanelController(task, options = {}) {
     const progressStage = normalizeStageText(snapshot?.progress?.stage);
     const badge = doc.getElementById("task-state-badge");
     if (badge) {
-      badge.textContent = snapshot.state;
+      badge.textContent = STATE_LABELS[snapshot.state] ?? snapshot.state;
       badge.className = `badge badge--${snapshot.state}`;
     }
     const bar = doc.getElementById("progress-bar");
@@ -133,10 +184,24 @@ function normalizeProgressRatio(ratio) {
  * @param {unknown} stage
  */
 function normalizeStageText(stage) {
-  if (typeof stage !== "string") return "ready";
+  if (typeof stage !== "string") return STAGE_LABELS.ready;
   const normalized = stage
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return normalized.slice(0, MAX_STAGE_TEXT_LENGTH) || "ready";
+  if (!normalized) return STAGE_LABELS.ready;
+  return (
+    STAGE_LABELS[normalized.toLowerCase()] ??
+    normalized.slice(0, MAX_STAGE_TEXT_LENGTH)
+  );
+}
+
+/**
+ * Translate only fixed product copy. Arbitrary server text remains redacted and
+ * visible verbatim so diagnostics do not lose technical meaning.
+ * @param {unknown} message
+ */
+function localizeLogMessage(message) {
+  if (typeof message !== "string") return message;
+  return LOG_MESSAGE_LABELS[message] ?? message;
 }

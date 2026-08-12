@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,14 +11,14 @@
       <header class="panel__header">
         <div class="panel__title-row">
           <h1 class="panel__title">CineVFX</h1>
-          <span id="task-state-badge" class="badge badge--idle" aria-live="polite">idle</span>
+          <span id="task-state-badge" class="badge badge--idle" aria-live="polite">空闲</span>
         </div>
-        <p class="panel__subtitle">Layered effects workflow</p>
+        <p class="panel__subtitle">分层特效工作流（开发预览）</p>
       </header>
 
-      <section class="panel__section" aria-label="Connection">
+      <section class="panel__section" aria-label="连接设置">
         <label class="field">
-          <span class="field__label">Mock API base URL</span>
+          <span class="field__label">本地服务地址</span>
           <input
             id="base-url"
             class="field__input"
@@ -29,46 +29,46 @@
           />
         </label>
         <label class="field">
-          <span class="field__label">Effect label</span>
+          <span class="field__label">效果名称</span>
           <input
             id="effect-label"
             class="field__input"
             type="text"
-            value="golden-magic-benchmark"
+            value="金色魔法氛围"
             spellcheck="false"
             autocomplete="off"
           />
         </label>
       </section>
 
-      <section class="panel__section panel__section--actions" aria-label="Actions">
+      <section class="panel__section panel__section--actions" aria-label="操作">
         <button id="btn-plan-proxy" class="btn btn--secondary" type="button">
-          Plan proxy
+          规划代理图
         </button>
         <button id="btn-submit" class="btn btn--primary" type="button">
-          Submit job
+          提交任务
         </button>
         <button id="btn-cancel" class="btn btn--ghost" type="button" disabled>
-          Cancel
+          取消任务
         </button>
         <button id="btn-import" class="btn btn--secondary" type="button" disabled>
-          Plan import
+          规划导入
         </button>
       </section>
 
-      <section class="panel__section" aria-label="Progress">
+      <section class="panel__section" aria-label="进度">
         <div class="progress">
           <div class="progress__track">
             <div id="progress-bar" class="progress__bar" style="width: 0%"></div>
           </div>
           <div class="progress__meta">
-            <span id="progress-stage">ready</span>
+            <span id="progress-stage">就绪</span>
             <span id="progress-ratio">0%</span>
           </div>
         </div>
       </section>
 
-      <section class="panel__section" aria-label="Status log">
+      <section class="panel__section" aria-label="运行日志">
         <pre id="status-log" class="log" role="log" aria-live="polite"></pre>
       </section>
 

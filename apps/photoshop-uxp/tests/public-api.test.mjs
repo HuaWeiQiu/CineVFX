@@ -88,7 +88,7 @@ describe("public API surface", () => {
     const panel = createPanelController(task, {
       document: /** @type {any} */ (doc),
     });
-    assert.equal(badge.textContent, "idle");
+    assert.equal(badge.textContent, "空闲");
     assert.equal(planBtn.disabled, false);
     assert.equal(submitBtn.disabled, false);
     assert.equal(cancelBtn.disabled, true);
@@ -105,7 +105,7 @@ describe("public API surface", () => {
 
     task.beginSubmit({ effectLabel: "x" });
     panel.render(task.getSnapshot());
-    assert.equal(badge.textContent, "submitting");
+    assert.equal(badge.textContent, "正在提交");
     assert.equal(planBtn.disabled, true);
     assert.equal(submitBtn.disabled, true);
     assert.equal(cancelBtn.disabled, false);
@@ -116,7 +116,7 @@ describe("public API surface", () => {
     });
     panel.render(task.getSnapshot());
     assert.equal(bar.style.width, "40%");
-    assert.equal(stage.textContent, "render");
+    assert.equal(stage.textContent, "渲染中");
     assert.equal(ratio.textContent, "40%");
     assert.equal(cancelBtn.disabled, false);
     assert.equal(importBtn.disabled, true);
@@ -126,7 +126,7 @@ describe("public API surface", () => {
       manifestId: "manifest_mock_0001",
     });
     panel.render(task.getSnapshot());
-    assert.equal(badge.textContent, "succeeded");
+    assert.equal(badge.textContent, "已完成");
     assert.equal(cancelBtn.disabled, true);
     assert.equal(importBtn.disabled, false);
     assert.equal(planBtn.disabled, false);
@@ -147,7 +147,7 @@ describe("public API surface", () => {
     });
     assert.equal(bar.style.width, "0%");
     assert.equal(ratio.textContent, "0%");
-    assert.equal(stage.textContent, "ready");
+    assert.equal(stage.textContent, "就绪");
 
     panel.render({
       ...task.getSnapshot(),
@@ -156,6 +156,38 @@ describe("public API surface", () => {
     assert.equal(bar.style.width, "0%");
     assert.equal(ratio.textContent, "0%");
 
+    panel.dispose();
+  });
+
+  it("renders Simplified Chinese panel copy and localizes fixed workflow logs", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { join, dirname } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const html = await readFile(
+      join(dirname(fileURLToPath(import.meta.url)), "../index.html"),
+      "utf8",
+    );
+    for (const copy of [
+      'lang="zh-CN"',
+      "分层特效工作流（开发预览）",
+      "本地服务地址",
+      "效果名称",
+      "规划代理图",
+      "提交任务",
+      "取消任务",
+      "规划导入",
+    ]) {
+      assert.ok(html.includes(copy), `missing Chinese panel copy: ${copy}`);
+    }
+
+    const task = api.createTaskController();
+    const lines = [];
+    const panel = createPanelController(task, {
+      document: null,
+      log: (line) => lines.push(line),
+    });
+    panel.appendLog("Proxy plan created (metadata only)");
+    assert.equal(lines[0], "代理图方案已创建（仅元数据）");
     panel.dispose();
   });
 

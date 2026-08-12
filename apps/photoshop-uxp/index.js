@@ -21,8 +21,8 @@ const workflow = createPanelWorkflow({
   log: (message, fields) => panel.appendLog(message, fields),
 });
 
-panel.appendLog("CineVFX development shell ready", {
-  unverified: Object.keys(UNVERIFIED),
+panel.appendLog("CineVFX 开发预览已就绪", {
+  unverifiedCount: Object.keys(UNVERIFIED).length,
 });
 
 function qs(id) {
@@ -65,7 +65,7 @@ qs("btn-plan-proxy")?.addEventListener("click", () => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    panel.appendLog("Proxy planning failed", { message });
+    panel.appendLog("代理图规划失败", { message });
   }
 });
 
@@ -86,7 +86,7 @@ qs("btn-submit")?.addEventListener("click", async () => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    panel.appendLog("Submit failed", { message });
+    panel.appendLog("任务提交失败", { message });
   }
 });
 
@@ -95,7 +95,7 @@ qs("btn-cancel")?.addEventListener("click", async () => {
     await workflow.cancelActiveJob({ baseUrl: baseUrl() });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    panel.appendLog("Cancel failed", { message });
+    panel.appendLog("取消任务失败", { message });
   }
 });
 
@@ -106,13 +106,13 @@ qs("btn-import")?.addEventListener("click", async () => {
       protectedSource: sessionProtectedSource(),
     });
     if (!result.ok) {
-      panel.appendLog("Import planning failed", {
+      panel.appendLog("导入规划失败", {
         errorCount: result.errors?.length ?? 0,
       });
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    panel.appendLog("Import planning failed", { message });
+    panel.appendLog("导入规划失败", { message });
   }
 });
 
