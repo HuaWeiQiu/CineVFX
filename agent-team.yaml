@@ -101,7 +101,7 @@ strategies:
       maxAgentInvocations: 48
       maxProcessOutputBytes: 1048576
       maxArtifactBytes: 1073741824
-      approvalGates: [plan, final]
+      approvalGates: [final]
       approvalTimeoutSeconds: 172800
       roleProfiles:
         orchestrator: codex-orchestrator
@@ -119,7 +119,7 @@ strategies:
       maxAgentInvocations: 64
       maxProcessOutputBytes: 1048576
       maxArtifactBytes: 2147483648
-      approvalGates: [plan, final]
+      approvalGates: [final]
       approvalTimeoutSeconds: 172800
       roleProfiles:
         orchestrator: codex-orchestrator
