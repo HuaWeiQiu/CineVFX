@@ -1,4 +1,8 @@
-/** Local orchestration for inspect -> plan -> bounded Photoshop write. */
+/**
+ * Local orchestration for inspect -> plan -> bounded Photoshop write.
+ * Host cancel/failure leftover cleanup stays inside that write. This module
+ * does not start a second Photoshop write to remove a partial result group.
+ */
 
 import { cloneDataOnlyGraph } from "../safety/data-snapshot.mjs";
 import { planGlowEffect } from "./glow-plan.mjs";

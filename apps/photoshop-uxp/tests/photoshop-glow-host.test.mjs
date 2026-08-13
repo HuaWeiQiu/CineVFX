@@ -356,6 +356,121 @@ describe("createPhotoshopGlowHost", () => {
     assertSourcePristine(fake.source);
   });
 
+  it("deletes leftover CineVFX groups after create, first duplicate, blur, or cancel", async () => {
+    // Node fake orchestration only. Real Photoshop cancel/failure remains unverified.
+    const cases = [
+      ["cancel after group create", { cancelAfter: "create_group" }, "user_cancelled", "create_group"],
+      ["failure after group create", { failAfter: "create_group" }, "host_operation_failed", "create_group"],
+      ["cancel after first duplicate", { cancelAfter: "create_edge" }, "user_cancelled", "create_edge"],
+      ["failure after first duplicate", { failAfter: "create_edge" }, "host_operation_failed", "create_edge"],
+      ["cancel after blur", { cancelAfter: "bloom_blur" }, "user_cancelled", "bloom_blur"],
+      ["failure after blur", { failAfter: "bloom_blur" }, "host_operation_failed", "bloom_blur"],
+    ];
+
+    for (const [label, options, code, stage] of cases) {
+      const secret = "private leftover host path /Users/secret.psd";
+      const fake = createFakePhotoshop({
+        ...options,
+        historyDiscardLeavesLayers: true,
+        injectedFailureText: secret,
+      });
+      const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+      const context = host.inspectActiveContext();
+
+      let failure;
+      try {
+        await host.applyGlow(planFor(context));
+      } catch (error) {
+        failure = error;
+      }
+      assert.ok(failure instanceof GlowHostError, label);
+      assert.equal(failure.code, code, label);
+      assert.equal(failure.stage, stage, label);
+      assert.equal(String(failure.message).includes(secret), false, label);
+      assert.equal(fake.modalCalls, 1, label);
+      assert.deepEqual(fake.historyCalls, [
+        ["suspend", { documentID: 7, name: "CineVFX 发光" }],
+        ["resume", fake.suspension, false],
+      ], label);
+      const deleteAt = fake.hostOperations.findIndex((op) => op[0] === "delete");
+      const resumeAt = fake.hostOperations.findIndex((op) => op[0] === "resume");
+      assert.ok(deleteAt >= 0 && resumeAt > deleteAt, label);
+      assert.ok(fake.deletedLayerIds.length > 0, label);
+      assert.equal(fake.deletedLayerIds.includes(11), false, label);
+      assert.equal(fake.source.deleteCalls, 0, label);
+      assert.equal(hasNamedLayer(fake.document, "CineVFX 发光"), false, label);
+      assert.deepEqual(fake.document.layers, [fake.source], label);
+      assertSourcePristine(fake.source);
+    }
+  });
+
+  it("fails closed when leftover cleanup cannot remove a partial result group", async () => {
+    const secret = "private leftover delete path /Users/secret.psd";
+    const fake = createFakePhotoshop({
+      failAfter: "create_group",
+      historyDiscardLeavesLayers: true,
+      blockLeftoverDelete: true,
+      injectedFailureText: secret,
+    });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+
+    let failure;
+    try {
+      await host.applyGlow(planFor(context));
+    } catch (error) {
+      failure = error;
+    }
+    assert.ok(failure instanceof GlowHostError);
+    assert.equal(failure.code, "rollback_failed");
+    assert.equal(failure.stage, "rollback");
+    assert.equal(String(failure.message).includes(secret), false);
+    assert.equal(hasNamedLayer(fake.document, "CineVFX 发光"), true);
+    assert.equal(fake.source.deleteCalls, 0);
+    assertSourcePristine(fake.source);
+  });
+
+  it("does not delete a leftover group that contains the protected source", async () => {
+    // Node fake orchestration only. Real Photoshop cancel/failure remains unverified.
+    const secret = "private leftover nest path /Users/secret.psd";
+    const fake = createFakePhotoshop({
+      failAfter: "create_group",
+      historyDiscardLeavesLayers: true,
+      injectedFailureText: secret,
+      afterCreateGroup(source) {
+        const group = source.document.layers.find((layer) => layer !== source);
+        assert.ok(group);
+        removeLayer(source.document.layers, source);
+        source.parent = group;
+        if (!Array.isArray(group.layers)) group.layers = [];
+        group.layers.push(source);
+      },
+    });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+
+    let failure;
+    try {
+      await host.applyGlow(planFor(context));
+    } catch (error) {
+      failure = error;
+    }
+    assert.ok(failure instanceof GlowHostError);
+    assert.equal(failure.code, "rollback_failed");
+    assert.equal(failure.stage, "rollback");
+    assert.equal(String(failure.message).includes(secret), false);
+    assert.equal(fake.modalCalls, 1);
+    assert.deepEqual(fake.historyCalls, [
+      ["suspend", { documentID: 7, name: "CineVFX 发光" }],
+      ["resume", fake.suspension, false],
+    ]);
+    assert.equal(fake.deletedLayerIds.length, 0);
+    assert.equal(fake.source.deleteCalls, 0);
+    assert.equal(documentContainsLayer(fake.document, fake.source), true);
+    assert.equal(fake.source.id, 11);
+    assert.equal(hasNamedLayer(fake.document, "CineVFX 发光"), true);
+  });
+
   it("fails closed on history sentinel before document writes", async () => {
     const fake = createFakePhotoshop({ suspension: 0xffffffff });
     const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
@@ -392,6 +507,10 @@ function createFakePhotoshop(options = {}) {
   let nextLayerId = 20;
   const historyCalls = [];
   const batchCalls = [];
+  const deletedLayerIds = [];
+  const hostOperations = [];
+  const injectedFailureText =
+    options.injectedFailureText ?? "private host failure /Users/secret.psd";
   const suspension = options.suspension ?? { id: "history-1" };
   const document = {
     id: 7,
@@ -413,9 +532,14 @@ function createFakePhotoshop(options = {}) {
         location.collection.splice(location.index, 0, group);
       };
       this.layers.unshift(group);
-      if (options.cancelAfterCreateGroup) executionContext.isCancelled = true;
+      if (options.cancelAfterCreateGroup || options.cancelAfter === "create_group") {
+        executionContext.isCancelled = true;
+      }
       if (typeof options.afterCreateGroup === "function") {
         options.afterCreateGroup(source);
+      }
+      if (options.failAfter === "create_group") {
+        throw new Error(injectedFailureText);
       }
       return group;
     },
@@ -429,11 +553,13 @@ function createFakePhotoshop(options = {}) {
     hostControl: {
       async suspendHistory(details) {
         historyCalls.push(["suspend", details]);
+        hostOperations.push(["suspend"]);
         return suspension;
       },
       async resumeHistory(token, commit) {
         historyCalls.push(["resume", token, commit]);
-        if (!commit) {
+        hostOperations.push(["resume", commit]);
+        if (!commit && !options.historyDiscardLeavesLayers) {
           document.layers = [source];
           source.parent = null;
           document.activeLayers = [source];
@@ -442,6 +568,7 @@ function createFakePhotoshop(options = {}) {
     },
   };
   let modalOptions;
+  let modalCalls = 0;
   let batchIndex = 0;
   const imaging = options.imaging
     ? createFakeImaging(options.imaging === true ? {} : options.imaging)
@@ -451,6 +578,7 @@ function createFakePhotoshop(options = {}) {
     constants,
     core: {
       async executeAsModal(callback, passedOptions) {
+        modalCalls += 1;
         modalOptions = passedOptions;
         return callback(executionContext);
       },
@@ -471,11 +599,14 @@ function createFakePhotoshop(options = {}) {
     source,
     historyCalls,
     batchCalls,
+    deletedLayerIds,
+    hostOperations,
     suspension,
     executionContext,
     imaging,
   };
   Object.defineProperty(fake, "modalOptions", { get: () => modalOptions });
+  Object.defineProperty(fake, "modalCalls", { get: () => modalCalls });
   return fake;
 
   function makeDuplicate(owner, group, name) {
@@ -503,13 +634,42 @@ function createFakePhotoshop(options = {}) {
       isBackgroundLayer: id === 11,
       boundsNoEffects: { left: 10, top: 20, right: 110, bottom: 220 },
       duplicateCalls: [],
+      deleteCalls: 0,
       async duplicate(relative, placement, duplicateName) {
         this.duplicateCalls.push([relative, placement, duplicateName]);
         assert.equal(placement, constants.ElementPlacement.PLACEINSIDE);
-        return makeDuplicate(this, relative, duplicateName);
+        const copy = makeDuplicate(this, relative, duplicateName);
+        if (this.duplicateCalls.length === 1 && options.cancelAfter === "create_edge") {
+          executionContext.isCancelled = true;
+        }
+        if (this.duplicateCalls.length === 1 && options.failAfter === "create_edge") {
+          throw new Error(injectedFailureText);
+        }
+        return copy;
       },
       async applyGaussianBlur(radius) {
         this.gaussianBlurRadius = radius;
+        if (options.cancelAfter === "bloom_blur") {
+          executionContext.isCancelled = true;
+        }
+        if (options.failAfter === "bloom_blur") {
+          throw new Error(injectedFailureText);
+        }
+      },
+      async delete() {
+        this.deleteCalls += 1;
+        if (this.id === 11) {
+          throw new Error("protected source must not be deleted");
+        }
+        if (options.blockLeftoverDelete) {
+          throw new Error(injectedFailureText);
+        }
+        deletedLayerIds.push(this.id);
+        hostOperations.push(["delete", this.id]);
+        if (Array.isArray(this.layers)) {
+          this.layers.length = 0;
+        }
+        removeLayer(doc.layers, this);
       },
     };
     return layer;
@@ -597,6 +757,32 @@ function createFakeImaging(options = {}) {
       return disposed;
     },
   };
+}
+
+function hasNamedLayer(document, name) {
+  let found = false;
+  function visit(layers) {
+    if (!Array.isArray(layers)) return;
+    for (const layer of layers) {
+      if (layer.name === name) found = true;
+      if (Array.isArray(layer.layers)) visit(layer.layers);
+    }
+  }
+  visit(document.layers);
+  return found;
+}
+
+function documentContainsLayer(document, target) {
+  let found = false;
+  function visit(layers) {
+    if (!Array.isArray(layers)) return;
+    for (const layer of layers) {
+      if (layer === target) found = true;
+      if (Array.isArray(layer.layers)) visit(layer.layers);
+    }
+  }
+  visit(document.layers);
+  return found;
 }
 
 function assertSourcePristine(source) {

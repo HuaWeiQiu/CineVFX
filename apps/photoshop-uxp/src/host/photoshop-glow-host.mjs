@@ -145,6 +145,8 @@ export function createPhotoshopGlowHost(options) {
           let suspension = null;
           let historyOwned = false;
           let primaryError = null;
+          let hostDocument = null;
+          let beforeIds = null;
 
           try {
             // This must remain the first host operation in the callback. No write or
@@ -169,7 +171,8 @@ export function createPhotoshopGlowHost(options) {
             );
             assertNotCancelled(executionContext, "revalidate");
 
-            const beforeIds = collectLayerIds(current.document);
+            hostDocument = current.document;
+            beforeIds = collectLayerIds(current.document);
             stage = "suspend_history";
             suspension = await executionContext.hostControl.suspendHistory({
               documentID: protectedSnapshot.documentId,
@@ -293,6 +296,19 @@ export function createPhotoshopGlowHost(options) {
             primaryError = executionContext?.isCancelled
               ? new GlowHostError("user_cancelled", stage)
               : fixedError(error, "host_operation_failed", stage);
+            if (hostDocument && beforeIds) {
+              try {
+                // Explicit leftover deletion stays inside this modal/history
+                // transaction. History discard alone is not treated as proof.
+                await removeLeftoverCreatedLayers(
+                  hostDocument,
+                  beforeIds,
+                  protectedSnapshot.id,
+                );
+              } catch {
+                // Re-check after history discard. Never surface host delete text.
+              }
+            }
             if (historyOwned) {
               try {
                 await executionContext.hostControl.resumeHistory(
@@ -304,6 +320,20 @@ export function createPhotoshopGlowHost(options) {
                 // Throw a fixed rollback code without exposing either host error.
                 throw new GlowHostError("rollback_failed", "rollback");
               }
+            }
+            if (
+              hostDocument &&
+              beforeIds &&
+              hasLeftoverCreatedLayers(hostDocument, beforeIds)
+            ) {
+              throw new GlowHostError("rollback_failed", "rollback");
+            }
+            if (
+              hostDocument &&
+              beforeIds &&
+              !findLayerById(hostDocument, protectedSnapshot.id)
+            ) {
+              throw new GlowHostError("source_missing", "rollback");
             }
             throw primaryError;
           }
@@ -893,16 +923,105 @@ function verifyCreatedGraph({ document, source, group, edge, bloom, beforeIds })
   }
 }
 
-function collectLayerIds(document) {
+function collectLayerIds(document, stage = "verify") {
   const ids = new Set();
   walkLayers(document.layers, (layer) => {
-    const id = positiveSafeInteger(layer.id, "invalid_layer_tree", "verify");
+    const id = positiveSafeInteger(layer.id, "invalid_layer_tree", stage);
     if (ids.has(id)) {
-      throw new GlowHostError("invalid_layer_tree", "verify");
+      throw new GlowHostError("invalid_layer_tree", stage);
     }
     ids.add(id);
-  });
+  }, stage);
   return ids;
+}
+
+function leftoverLayerIds(document, beforeIds) {
+  const added = [];
+  for (const id of collectLayerIds(document, "rollback")) {
+    if (!beforeIds.has(id)) added.push(id);
+  }
+  return added;
+}
+
+function hasLeftoverCreatedLayers(document, beforeIds) {
+  try {
+    return leftoverLayerIds(document, beforeIds).length > 0;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Delete only leftover roots created in this transaction. Never delete, move,
+ * or rewrite the protected source or any pre-existing layer. Group delete
+ * removes descendants, so a leftover root that contains the source or any
+ * beforeIds layer is left in place and cleanup fails closed.
+ */
+async function removeLeftoverCreatedLayers(document, beforeIds, sourceLayerId) {
+  let safety = 0;
+  while (safety < 8) {
+    safety += 1;
+    const leftoverIds = leftoverLayerIds(document, beforeIds);
+    if (leftoverIds.length === 0) return;
+    if (
+      leftoverIds.includes(sourceLayerId) ||
+      leftoverIds.some((id) => beforeIds.has(id))
+    ) {
+      throw new GlowHostError("rollback_failed", "rollback");
+    }
+    const leftoverSet = new Set(leftoverIds);
+    const leftovers = leftoverIds
+      .map((id) => findLayerById(document, id))
+      .filter((layer) => layer && layer.id !== sourceLayerId && !beforeIds.has(layer.id));
+    if (leftovers.length !== leftoverIds.length) {
+      throw new GlowHostError("rollback_failed", "rollback");
+    }
+    const roots = leftovers.filter((layer) => {
+      const parentId =
+        layer.parent && Number.isSafeInteger(layer.parent.id) && layer.parent.id > 0
+          ? layer.parent.id
+          : null;
+      return parentId === null || !leftoverSet.has(parentId);
+    });
+    if (roots.length === 0) {
+      throw new GlowHostError("rollback_failed", "rollback");
+    }
+    for (const target of roots) {
+      if (typeof target.delete !== "function") {
+        throw new GlowHostError("rollback_failed", "rollback");
+      }
+      if (leftoverContainsProtectedLayer(target, beforeIds, sourceLayerId)) {
+        throw new GlowHostError("rollback_failed", "rollback");
+      }
+      await target.delete();
+    }
+  }
+  if (leftoverLayerIds(document, beforeIds).length > 0) {
+    throw new GlowHostError("rollback_failed", "rollback");
+  }
+}
+
+function leftoverContainsProtectedLayer(target, beforeIds, sourceLayerId) {
+  try {
+    if (target.id === sourceLayerId || beforeIds.has(target.id)) {
+      return true;
+    }
+    if (!target.layers || typeof target.layers.length !== "number") {
+      return false;
+    }
+    let found = false;
+    walkLayers(target.layers, (layer) => {
+      if (layer.id === sourceLayerId || beforeIds.has(layer.id)) {
+        found = true;
+      }
+    }, "rollback");
+    return found;
+  } catch (error) {
+    if (error instanceof GlowHostError && error.code === "rollback_failed") {
+      throw error;
+    }
+    throw new GlowHostError("rollback_failed", "rollback");
+  }
 }
 
 function findLayerById(document, id) {
@@ -929,13 +1048,13 @@ function findLayerLocation(document, id) {
   return found;
 }
 
-function walkLayers(collection, visitor) {
-  assertDenseCollection(collection, "invalid_layer_tree", "verify");
+function walkLayers(collection, visitor, stage = "verify") {
+  assertDenseCollection(collection, "invalid_layer_tree", stage);
   for (let index = 0; index < collection.length; index += 1) {
     const layer = collection[index];
     visitor(layer);
     if (layer.layers && typeof layer.layers.length === "number") {
-      walkLayers(layer.layers, visitor);
+      walkLayers(layer.layers, visitor, stage);
     }
   }
 }
