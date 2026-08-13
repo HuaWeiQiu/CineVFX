@@ -35,6 +35,42 @@ profiles:
       supportsWebSockets: false
     timeoutSeconds: 1800
 
+  grok-orchestrator:
+    adapter: grok
+    model: grok-4.6
+    reasoning: high
+    permission: read-only
+    externalTools: deny
+    maxTurns: 20
+    timeoutSeconds: 1800
+
+  grok-architect:
+    adapter: grok
+    model: grok-4.6
+    reasoning: high
+    permission: read-only
+    externalTools: deny
+    maxTurns: 20
+    timeoutSeconds: 1800
+
+  grok-reviewer:
+    adapter: grok
+    model: grok-4.6
+    reasoning: high
+    permission: read-only
+    externalTools: deny
+    maxTurns: 16
+    timeoutSeconds: 1800
+
+  grok-tester:
+    adapter: grok
+    model: grok-4.6
+    reasoning: high
+    permission: read-only
+    externalTools: deny
+    maxTurns: 16
+    timeoutSeconds: 1200
+
   grok-worker:
     adapter: grok
     model: grok-4.6
@@ -75,19 +111,23 @@ profiles:
 roles:
   orchestrator:
     defaultProfile: codex-orchestrator
-    allowedProfiles: [codex-orchestrator]
+    allowedProfiles: [codex-orchestrator, grok-orchestrator]
+    fallbackProfiles: [grok-orchestrator]
   architect:
     defaultProfile: codex-architect
-    allowedProfiles: [codex-architect]
+    allowedProfiles: [codex-architect, grok-architect]
+    fallbackProfiles: [grok-architect]
   worker:
     defaultProfile: grok-worker
     allowedProfiles: [grok-worker]
   reviewer:
     defaultProfile: codex-reviewer
-    allowedProfiles: [codex-reviewer]
+    allowedProfiles: [codex-reviewer, grok-reviewer]
+    fallbackProfiles: [grok-reviewer]
   tester:
     defaultProfile: codex-tester
-    allowedProfiles: [codex-tester]
+    allowedProfiles: [codex-tester, grok-tester]
+    fallbackProfiles: [grok-tester]
 
 strategies:
   default: contract-first
