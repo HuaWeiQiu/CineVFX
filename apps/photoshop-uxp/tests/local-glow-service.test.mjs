@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createLocalGlowService } from "../src/effects/local-glow-service.mjs";
+import { GlowHostError } from "../src/host/photoshop-glow-host.mjs";
 import { createWriteScopeGuard } from "../src/safety/network-boundary.mjs";
 
 function hostContext(overrides = {}) {
@@ -189,6 +190,38 @@ describe("createLocalGlowService", () => {
     await assert.rejects(() => service.apply(settings()), /fixed host failure/);
     const recovered = await service.apply(settings());
     assert.equal(recovered.hostResult.committed, true);
+  });
+
+  it("propagates host cancel and failure from one write and does not start leftover cleanup itself", async () => {
+    // Node orchestration only. Real host cancel remains unverified.
+    const cases = [
+      new GlowHostError("user_cancelled", "create_group"),
+      new GlowHostError("host_operation_failed", "create_edge"),
+      new GlowHostError("user_cancelled", "bloom_blur"),
+    ];
+
+    for (const hostError of cases) {
+      let applyCalls = 0;
+      const guard = createWriteScopeGuard();
+      const service = createLocalGlowService({
+        host: {
+          inspectActiveContext: () => hostContext(),
+          async applyGlow() {
+            applyCalls += 1;
+            assert.equal(guard.getScope(), "inside_modal");
+            throw hostError;
+          },
+        },
+        writeGuard: guard,
+      });
+
+      await assert.rejects(
+        () => service.apply(settings()),
+        (error) => error === hostError,
+      );
+      assert.equal(applyCalls, 1);
+      assert.equal(guard.getScope(), "outside");
+    }
   });
 
   it("does not enter the host while a network phase is active", async () => {
