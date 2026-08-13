@@ -130,7 +130,150 @@ describe("createPhotoshopGlowHost", () => {
       continueOnError: false,
       immediateRedraw: false,
     });
+    assert.equal("digest" in result, false);
+    assert.equal("sha256" in result, false);
+    assert.equal("sourceIdentity" in result, false);
     assertSourcePristine(fake.source);
+  });
+
+  it("hashes source pixels through a fake Imaging API and disposes imageData", async () => {
+    const fake = createFakePhotoshop({ imaging: true });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+    const result = await host.applyGlow(planFor(context));
+
+    assert.equal(result.committed, true);
+    assert.equal(fake.imaging.calls.length, 2);
+    assert.ok(fake.imaging.calls.every((call) => (
+      call.documentID === 7 && call.layerID === 11
+    )));
+    assert.equal(fake.imaging.created, 2);
+    assert.equal(fake.imaging.disposed, 2);
+    assert.equal(fake.imaging.disposed, fake.imaging.created);
+    assert.equal("digest" in result, false);
+    assert.equal("sha256" in result, false);
+    assertSourcePristine(fake.source);
+  });
+
+  it("disposes imageData when Imaging getData fails and leaves pixels unverified", async () => {
+    const fake = createFakePhotoshop({
+      imaging: { failGetData: true },
+    });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+    const result = await host.applyGlow(planFor(context));
+
+    assert.equal(result.committed, true);
+    assert.equal(fake.imaging.created, 2);
+    assert.equal(fake.imaging.disposed, 2);
+    assert.equal("digest" in result, false);
+    assert.equal("sha256" in result, false);
+    assertSourcePristine(fake.source);
+  });
+
+  it("rejects a source pixel digest mismatch after the write", async () => {
+    const fake = createFakePhotoshop({
+      imaging: { mutateAfterFirstRead: true },
+    });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+
+    await assert.rejects(
+      () => host.applyGlow(planFor(context)),
+      (error) =>
+        error instanceof GlowHostError &&
+        error.code === "source_changed" &&
+        error.stage === "verify",
+    );
+    assert.equal(fake.imaging.created, 2);
+    assert.equal(fake.imaging.disposed, 2);
+    assert.deepEqual(fake.historyCalls.at(-1), ["resume", fake.suspension, false]);
+    assertSourcePristine(fake.source);
+  });
+
+  it("rejects parent, bounds, visibility, opacity, blend, and lock races", async () => {
+    const cases = [
+      ["parent", (source) => {
+        source.parent = { id: 99 };
+      }, "source_changed"],
+      ["bounds", (source) => {
+        source.boundsNoEffects = { left: 11, top: 20, right: 110, bottom: 220 };
+      }, "source_changed"],
+      ["visibility", (source) => {
+        source.visible = false;
+      }, "source_not_visible"],
+      ["opacity", (source) => {
+        source.opacity = 90;
+      }, "source_changed"],
+      ["blend", (source) => {
+        source.blendMode = "multiply";
+      }, "source_changed"],
+      ["locks", (source) => {
+        source.pixelsLocked = false;
+      }, "source_changed"],
+    ];
+
+    for (const [label, mutate, code] of cases) {
+      const fake = createFakePhotoshop();
+      const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+      const context = host.inspectActiveContext();
+      mutate(fake.source);
+
+      await assert.rejects(
+        () => host.applyGlow(planFor(context)),
+        (error) =>
+          error instanceof GlowHostError &&
+          error.code === code &&
+          error.stage === "revalidate",
+        label,
+      );
+      assert.deepEqual(fake.historyCalls, [], label);
+      assert.equal(fake.document.createGroupCalls, 0, label);
+      assert.equal(fake.source.duplicateCalls.length, 0, label);
+    }
+  });
+
+  it("rejects source identity changes discovered after the write", async () => {
+    const cases = [
+      ["parent", (source) => {
+        source.parent = { id: 99 };
+      }],
+      ["bounds", (source) => {
+        source.boundsNoEffects = { left: 11, top: 20, right: 110, bottom: 220 };
+      }],
+      ["visibility", (source) => {
+        source.visible = false;
+      }],
+      ["opacity", (source) => {
+        source.opacity = 90;
+      }],
+      ["blend", (source) => {
+        source.blendMode = "multiply";
+      }],
+      ["locks", (source) => {
+        source.allLocked = false;
+      }],
+    ];
+
+    for (const [label, mutate] of cases) {
+      const fake = createFakePhotoshop({
+        afterCreateGroup(source) {
+          mutate(source);
+        },
+      });
+      const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+      const context = host.inspectActiveContext();
+
+      await assert.rejects(
+        () => host.applyGlow(planFor(context)),
+        (error) =>
+          error instanceof GlowHostError &&
+          error.code === "source_changed" &&
+          error.stage === "verify",
+        label,
+      );
+      assert.deepEqual(fake.historyCalls.at(-1), ["resume", fake.suspension, false], label);
+    }
   });
 
   it("rejects selection races before history suspension or any write", async () => {
@@ -213,6 +356,121 @@ describe("createPhotoshopGlowHost", () => {
     assertSourcePristine(fake.source);
   });
 
+  it("deletes leftover CineVFX groups after create, first duplicate, blur, or cancel", async () => {
+    // Node fake orchestration only. Real Photoshop cancel/failure remains unverified.
+    const cases = [
+      ["cancel after group create", { cancelAfter: "create_group" }, "user_cancelled", "create_group"],
+      ["failure after group create", { failAfter: "create_group" }, "host_operation_failed", "create_group"],
+      ["cancel after first duplicate", { cancelAfter: "create_edge" }, "user_cancelled", "create_edge"],
+      ["failure after first duplicate", { failAfter: "create_edge" }, "host_operation_failed", "create_edge"],
+      ["cancel after blur", { cancelAfter: "bloom_blur" }, "user_cancelled", "bloom_blur"],
+      ["failure after blur", { failAfter: "bloom_blur" }, "host_operation_failed", "bloom_blur"],
+    ];
+
+    for (const [label, options, code, stage] of cases) {
+      const secret = "private leftover host path /Users/secret.psd";
+      const fake = createFakePhotoshop({
+        ...options,
+        historyDiscardLeavesLayers: true,
+        injectedFailureText: secret,
+      });
+      const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+      const context = host.inspectActiveContext();
+
+      let failure;
+      try {
+        await host.applyGlow(planFor(context));
+      } catch (error) {
+        failure = error;
+      }
+      assert.ok(failure instanceof GlowHostError, label);
+      assert.equal(failure.code, code, label);
+      assert.equal(failure.stage, stage, label);
+      assert.equal(String(failure.message).includes(secret), false, label);
+      assert.equal(fake.modalCalls, 1, label);
+      assert.deepEqual(fake.historyCalls, [
+        ["suspend", { documentID: 7, name: "CineVFX 发光" }],
+        ["resume", fake.suspension, false],
+      ], label);
+      const deleteAt = fake.hostOperations.findIndex((op) => op[0] === "delete");
+      const resumeAt = fake.hostOperations.findIndex((op) => op[0] === "resume");
+      assert.ok(deleteAt >= 0 && resumeAt > deleteAt, label);
+      assert.ok(fake.deletedLayerIds.length > 0, label);
+      assert.equal(fake.deletedLayerIds.includes(11), false, label);
+      assert.equal(fake.source.deleteCalls, 0, label);
+      assert.equal(hasNamedLayer(fake.document, "CineVFX 发光"), false, label);
+      assert.deepEqual(fake.document.layers, [fake.source], label);
+      assertSourcePristine(fake.source);
+    }
+  });
+
+  it("fails closed when leftover cleanup cannot remove a partial result group", async () => {
+    const secret = "private leftover delete path /Users/secret.psd";
+    const fake = createFakePhotoshop({
+      failAfter: "create_group",
+      historyDiscardLeavesLayers: true,
+      blockLeftoverDelete: true,
+      injectedFailureText: secret,
+    });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+
+    let failure;
+    try {
+      await host.applyGlow(planFor(context));
+    } catch (error) {
+      failure = error;
+    }
+    assert.ok(failure instanceof GlowHostError);
+    assert.equal(failure.code, "rollback_failed");
+    assert.equal(failure.stage, "rollback");
+    assert.equal(String(failure.message).includes(secret), false);
+    assert.equal(hasNamedLayer(fake.document, "CineVFX 发光"), true);
+    assert.equal(fake.source.deleteCalls, 0);
+    assertSourcePristine(fake.source);
+  });
+
+  it("does not delete a leftover group that contains the protected source", async () => {
+    // Node fake orchestration only. Real Photoshop cancel/failure remains unverified.
+    const secret = "private leftover nest path /Users/secret.psd";
+    const fake = createFakePhotoshop({
+      failAfter: "create_group",
+      historyDiscardLeavesLayers: true,
+      injectedFailureText: secret,
+      afterCreateGroup(source) {
+        const group = source.document.layers.find((layer) => layer !== source);
+        assert.ok(group);
+        removeLayer(source.document.layers, source);
+        source.parent = group;
+        if (!Array.isArray(group.layers)) group.layers = [];
+        group.layers.push(source);
+      },
+    });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+
+    let failure;
+    try {
+      await host.applyGlow(planFor(context));
+    } catch (error) {
+      failure = error;
+    }
+    assert.ok(failure instanceof GlowHostError);
+    assert.equal(failure.code, "rollback_failed");
+    assert.equal(failure.stage, "rollback");
+    assert.equal(String(failure.message).includes(secret), false);
+    assert.equal(fake.modalCalls, 1);
+    assert.deepEqual(fake.historyCalls, [
+      ["suspend", { documentID: 7, name: "CineVFX 发光" }],
+      ["resume", fake.suspension, false],
+    ]);
+    assert.equal(fake.deletedLayerIds.length, 0);
+    assert.equal(fake.source.deleteCalls, 0);
+    assert.equal(documentContainsLayer(fake.document, fake.source), true);
+    assert.equal(fake.source.id, 11);
+    assert.equal(hasNamedLayer(fake.document, "CineVFX 发光"), true);
+  });
+
   it("fails closed on history sentinel before document writes", async () => {
     const fake = createFakePhotoshop({ suspension: 0xffffffff });
     const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
@@ -249,6 +507,10 @@ function createFakePhotoshop(options = {}) {
   let nextLayerId = 20;
   const historyCalls = [];
   const batchCalls = [];
+  const deletedLayerIds = [];
+  const hostOperations = [];
+  const injectedFailureText =
+    options.injectedFailureText ?? "private host failure /Users/secret.psd";
   const suspension = options.suspension ?? { id: "history-1" };
   const document = {
     id: 7,
@@ -270,7 +532,15 @@ function createFakePhotoshop(options = {}) {
         location.collection.splice(location.index, 0, group);
       };
       this.layers.unshift(group);
-      if (options.cancelAfterCreateGroup) executionContext.isCancelled = true;
+      if (options.cancelAfterCreateGroup || options.cancelAfter === "create_group") {
+        executionContext.isCancelled = true;
+      }
+      if (typeof options.afterCreateGroup === "function") {
+        options.afterCreateGroup(source);
+      }
+      if (options.failAfter === "create_group") {
+        throw new Error(injectedFailureText);
+      }
       return group;
     },
   };
@@ -283,11 +553,13 @@ function createFakePhotoshop(options = {}) {
     hostControl: {
       async suspendHistory(details) {
         historyCalls.push(["suspend", details]);
+        hostOperations.push(["suspend"]);
         return suspension;
       },
       async resumeHistory(token, commit) {
         historyCalls.push(["resume", token, commit]);
-        if (!commit) {
+        hostOperations.push(["resume", commit]);
+        if (!commit && !options.historyDiscardLeavesLayers) {
           document.layers = [source];
           source.parent = null;
           document.activeLayers = [source];
@@ -296,12 +568,17 @@ function createFakePhotoshop(options = {}) {
     },
   };
   let modalOptions;
+  let modalCalls = 0;
   let batchIndex = 0;
+  const imaging = options.imaging
+    ? createFakeImaging(options.imaging === true ? {} : options.imaging)
+    : null;
   const photoshop = {
     app: { activeDocument: document },
     constants,
     core: {
       async executeAsModal(callback, passedOptions) {
+        modalCalls += 1;
         modalOptions = passedOptions;
         return callback(executionContext);
       },
@@ -315,16 +592,21 @@ function createFakePhotoshop(options = {}) {
       },
     },
   };
+  if (imaging) photoshop.imaging = imaging.api;
   const fake = {
     photoshop,
     document,
     source,
     historyCalls,
     batchCalls,
+    deletedLayerIds,
+    hostOperations,
     suspension,
     executionContext,
+    imaging,
   };
   Object.defineProperty(fake, "modalOptions", { get: () => modalOptions });
+  Object.defineProperty(fake, "modalCalls", { get: () => modalCalls });
   return fake;
 
   function makeDuplicate(owner, group, name) {
@@ -344,6 +626,7 @@ function createFakePhotoshop(options = {}) {
       visible: true,
       opacity: 100,
       fillOpacity: 100,
+      blendMode: constants.BlendMode.NORMAL,
       allLocked: id === 11,
       pixelsLocked: id === 11,
       positionLocked: id === 11,
@@ -351,13 +634,42 @@ function createFakePhotoshop(options = {}) {
       isBackgroundLayer: id === 11,
       boundsNoEffects: { left: 10, top: 20, right: 110, bottom: 220 },
       duplicateCalls: [],
+      deleteCalls: 0,
       async duplicate(relative, placement, duplicateName) {
         this.duplicateCalls.push([relative, placement, duplicateName]);
         assert.equal(placement, constants.ElementPlacement.PLACEINSIDE);
-        return makeDuplicate(this, relative, duplicateName);
+        const copy = makeDuplicate(this, relative, duplicateName);
+        if (this.duplicateCalls.length === 1 && options.cancelAfter === "create_edge") {
+          executionContext.isCancelled = true;
+        }
+        if (this.duplicateCalls.length === 1 && options.failAfter === "create_edge") {
+          throw new Error(injectedFailureText);
+        }
+        return copy;
       },
       async applyGaussianBlur(radius) {
         this.gaussianBlurRadius = radius;
+        if (options.cancelAfter === "bloom_blur") {
+          executionContext.isCancelled = true;
+        }
+        if (options.failAfter === "bloom_blur") {
+          throw new Error(injectedFailureText);
+        }
+      },
+      async delete() {
+        this.deleteCalls += 1;
+        if (this.id === 11) {
+          throw new Error("protected source must not be deleted");
+        }
+        if (options.blockLeftoverDelete) {
+          throw new Error(injectedFailureText);
+        }
+        deletedLayerIds.push(this.id);
+        hostOperations.push(["delete", this.id]);
+        if (Array.isArray(this.layers)) {
+          this.layers.length = 0;
+        }
+        removeLayer(doc.layers, this);
       },
     };
     return layer;
@@ -374,6 +686,7 @@ function makeLayer(document, id, name) {
     visible: true,
     opacity: 100,
     fillOpacity: 100,
+    blendMode: constants.BlendMode.NORMAL,
     allLocked: false,
     pixelsLocked: false,
     positionLocked: false,
@@ -399,12 +712,87 @@ function removeLayer(collection, target) {
   if (found) found.collection.splice(found.index, 1);
 }
 
+function createFakeImaging(options = {}) {
+  const calls = [];
+  let created = 0;
+  let disposed = 0;
+  let reads = 0;
+  let pixels = new Uint8Array([10, 20, 30, 255, 40, 50, 60, 255]);
+
+  return {
+    api: {
+      async getPixels(request) {
+        calls.push(request);
+        created += 1;
+        reads += 1;
+        if (options.mutateAfterFirstRead && reads > 1) {
+          pixels = new Uint8Array([11, 20, 30, 255, 40, 50, 60, 255]);
+        }
+        const snapshot = new Uint8Array(pixels);
+        let disposedOnce = false;
+        return {
+          imageData: {
+            async getData() {
+              if (options.failGetData) {
+                throw new Error("private imaging buffer path /Users/secret.psd");
+              }
+              return snapshot;
+            },
+            async dispose() {
+              if (disposedOnce) return;
+              disposedOnce = true;
+              disposed += 1;
+            },
+          },
+        };
+      },
+    },
+    get calls() {
+      return calls;
+    },
+    get created() {
+      return created;
+    },
+    get disposed() {
+      return disposed;
+    },
+  };
+}
+
+function hasNamedLayer(document, name) {
+  let found = false;
+  function visit(layers) {
+    if (!Array.isArray(layers)) return;
+    for (const layer of layers) {
+      if (layer.name === name) found = true;
+      if (Array.isArray(layer.layers)) visit(layer.layers);
+    }
+  }
+  visit(document.layers);
+  return found;
+}
+
+function documentContainsLayer(document, target) {
+  let found = false;
+  function visit(layers) {
+    if (!Array.isArray(layers)) return;
+    for (const layer of layers) {
+      if (layer === target) found = true;
+      if (Array.isArray(layer.layers)) visit(layer.layers);
+    }
+  }
+  visit(document.layers);
+  return found;
+}
+
 function assertSourcePristine(source) {
   assert.equal(source.id, 11);
   assert.equal(source.name, "Portrait");
+  assert.equal(source.parent, null);
   assert.equal(source.visible, true);
   assert.equal(source.opacity, 100);
   assert.equal(source.fillOpacity, 100);
+  assert.equal(source.blendMode, constants.BlendMode.NORMAL);
   assert.equal(source.allLocked, true);
   assert.equal(source.pixelsLocked, true);
   assert.equal(source.positionLocked, true);

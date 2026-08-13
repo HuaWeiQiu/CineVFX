@@ -35,9 +35,45 @@ profiles:
       supportsWebSockets: false
     timeoutSeconds: 1800
 
+  grok-orchestrator:
+    adapter: grok
+    model: grok-4.6
+    reasoning: high
+    permission: read-only
+    externalTools: deny
+    maxTurns: 20
+    timeoutSeconds: 1800
+
+  grok-architect:
+    adapter: grok
+    model: grok-4.6
+    reasoning: high
+    permission: read-only
+    externalTools: deny
+    maxTurns: 20
+    timeoutSeconds: 1800
+
+  grok-reviewer:
+    adapter: grok
+    model: grok-4.6
+    reasoning: high
+    permission: read-only
+    externalTools: deny
+    maxTurns: 16
+    timeoutSeconds: 1800
+
+  grok-tester:
+    adapter: grok
+    model: grok-4.6
+    reasoning: high
+    permission: read-only
+    externalTools: deny
+    maxTurns: 16
+    timeoutSeconds: 1200
+
   grok-worker:
     adapter: grok
-    model: grok
+    model: grok-4.6
     reasoning: high
     permission: workspace-write
     externalTools: deny
@@ -75,19 +111,23 @@ profiles:
 roles:
   orchestrator:
     defaultProfile: codex-orchestrator
-    allowedProfiles: [codex-orchestrator]
+    allowedProfiles: [codex-orchestrator, grok-orchestrator]
+    fallbackProfiles: [grok-orchestrator]
   architect:
     defaultProfile: codex-architect
-    allowedProfiles: [codex-architect]
+    allowedProfiles: [codex-architect, grok-architect]
+    fallbackProfiles: [grok-architect]
   worker:
     defaultProfile: grok-worker
     allowedProfiles: [grok-worker]
   reviewer:
     defaultProfile: codex-reviewer
-    allowedProfiles: [codex-reviewer]
+    allowedProfiles: [codex-reviewer, grok-reviewer]
+    fallbackProfiles: [grok-reviewer]
   tester:
     defaultProfile: codex-tester
-    allowedProfiles: [codex-tester]
+    allowedProfiles: [codex-tester, grok-tester]
+    fallbackProfiles: [grok-tester]
 
 strategies:
   default: contract-first
@@ -101,7 +141,7 @@ strategies:
       maxAgentInvocations: 48
       maxProcessOutputBytes: 1048576
       maxArtifactBytes: 1073741824
-      approvalGates: [plan, final]
+      approvalGates: [final]
       approvalTimeoutSeconds: 172800
       roleProfiles:
         orchestrator: codex-orchestrator
@@ -119,7 +159,7 @@ strategies:
       maxAgentInvocations: 64
       maxProcessOutputBytes: 1048576
       maxArtifactBytes: 2147483648
-      approvalGates: [plan, final]
+      approvalGates: [final]
       approvalTimeoutSeconds: 172800
       roleProfiles:
         orchestrator: codex-orchestrator
