@@ -130,7 +130,150 @@ describe("createPhotoshopGlowHost", () => {
       continueOnError: false,
       immediateRedraw: false,
     });
+    assert.equal("digest" in result, false);
+    assert.equal("sha256" in result, false);
+    assert.equal("sourceIdentity" in result, false);
     assertSourcePristine(fake.source);
+  });
+
+  it("hashes source pixels through a fake Imaging API and disposes imageData", async () => {
+    const fake = createFakePhotoshop({ imaging: true });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+    const result = await host.applyGlow(planFor(context));
+
+    assert.equal(result.committed, true);
+    assert.equal(fake.imaging.calls.length, 2);
+    assert.ok(fake.imaging.calls.every((call) => (
+      call.documentID === 7 && call.layerID === 11
+    )));
+    assert.equal(fake.imaging.created, 2);
+    assert.equal(fake.imaging.disposed, 2);
+    assert.equal(fake.imaging.disposed, fake.imaging.created);
+    assert.equal("digest" in result, false);
+    assert.equal("sha256" in result, false);
+    assertSourcePristine(fake.source);
+  });
+
+  it("disposes imageData when Imaging getData fails and leaves pixels unverified", async () => {
+    const fake = createFakePhotoshop({
+      imaging: { failGetData: true },
+    });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+    const result = await host.applyGlow(planFor(context));
+
+    assert.equal(result.committed, true);
+    assert.equal(fake.imaging.created, 2);
+    assert.equal(fake.imaging.disposed, 2);
+    assert.equal("digest" in result, false);
+    assert.equal("sha256" in result, false);
+    assertSourcePristine(fake.source);
+  });
+
+  it("rejects a source pixel digest mismatch after the write", async () => {
+    const fake = createFakePhotoshop({
+      imaging: { mutateAfterFirstRead: true },
+    });
+    const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+    const context = host.inspectActiveContext();
+
+    await assert.rejects(
+      () => host.applyGlow(planFor(context)),
+      (error) =>
+        error instanceof GlowHostError &&
+        error.code === "source_changed" &&
+        error.stage === "verify",
+    );
+    assert.equal(fake.imaging.created, 2);
+    assert.equal(fake.imaging.disposed, 2);
+    assert.deepEqual(fake.historyCalls.at(-1), ["resume", fake.suspension, false]);
+    assertSourcePristine(fake.source);
+  });
+
+  it("rejects parent, bounds, visibility, opacity, blend, and lock races", async () => {
+    const cases = [
+      ["parent", (source) => {
+        source.parent = { id: 99 };
+      }, "source_changed"],
+      ["bounds", (source) => {
+        source.boundsNoEffects = { left: 11, top: 20, right: 110, bottom: 220 };
+      }, "source_changed"],
+      ["visibility", (source) => {
+        source.visible = false;
+      }, "source_not_visible"],
+      ["opacity", (source) => {
+        source.opacity = 90;
+      }, "source_changed"],
+      ["blend", (source) => {
+        source.blendMode = "multiply";
+      }, "source_changed"],
+      ["locks", (source) => {
+        source.pixelsLocked = false;
+      }, "source_changed"],
+    ];
+
+    for (const [label, mutate, code] of cases) {
+      const fake = createFakePhotoshop();
+      const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+      const context = host.inspectActiveContext();
+      mutate(fake.source);
+
+      await assert.rejects(
+        () => host.applyGlow(planFor(context)),
+        (error) =>
+          error instanceof GlowHostError &&
+          error.code === code &&
+          error.stage === "revalidate",
+        label,
+      );
+      assert.deepEqual(fake.historyCalls, [], label);
+      assert.equal(fake.document.createGroupCalls, 0, label);
+      assert.equal(fake.source.duplicateCalls.length, 0, label);
+    }
+  });
+
+  it("rejects source identity changes discovered after the write", async () => {
+    const cases = [
+      ["parent", (source) => {
+        source.parent = { id: 99 };
+      }],
+      ["bounds", (source) => {
+        source.boundsNoEffects = { left: 11, top: 20, right: 110, bottom: 220 };
+      }],
+      ["visibility", (source) => {
+        source.visible = false;
+      }],
+      ["opacity", (source) => {
+        source.opacity = 90;
+      }],
+      ["blend", (source) => {
+        source.blendMode = "multiply";
+      }],
+      ["locks", (source) => {
+        source.allLocked = false;
+      }],
+    ];
+
+    for (const [label, mutate] of cases) {
+      const fake = createFakePhotoshop({
+        afterCreateGroup(source) {
+          mutate(source);
+        },
+      });
+      const host = createPhotoshopGlowHost({ loadPhotoshop: () => fake.photoshop });
+      const context = host.inspectActiveContext();
+
+      await assert.rejects(
+        () => host.applyGlow(planFor(context)),
+        (error) =>
+          error instanceof GlowHostError &&
+          error.code === "source_changed" &&
+          error.stage === "verify",
+        label,
+      );
+      assert.deepEqual(fake.historyCalls.at(-1), ["resume", fake.suspension, false], label);
+    }
   });
 
   it("rejects selection races before history suspension or any write", async () => {
@@ -271,6 +414,9 @@ function createFakePhotoshop(options = {}) {
       };
       this.layers.unshift(group);
       if (options.cancelAfterCreateGroup) executionContext.isCancelled = true;
+      if (typeof options.afterCreateGroup === "function") {
+        options.afterCreateGroup(source);
+      }
       return group;
     },
   };
@@ -297,6 +443,9 @@ function createFakePhotoshop(options = {}) {
   };
   let modalOptions;
   let batchIndex = 0;
+  const imaging = options.imaging
+    ? createFakeImaging(options.imaging === true ? {} : options.imaging)
+    : null;
   const photoshop = {
     app: { activeDocument: document },
     constants,
@@ -315,6 +464,7 @@ function createFakePhotoshop(options = {}) {
       },
     },
   };
+  if (imaging) photoshop.imaging = imaging.api;
   const fake = {
     photoshop,
     document,
@@ -323,6 +473,7 @@ function createFakePhotoshop(options = {}) {
     batchCalls,
     suspension,
     executionContext,
+    imaging,
   };
   Object.defineProperty(fake, "modalOptions", { get: () => modalOptions });
   return fake;
@@ -344,6 +495,7 @@ function createFakePhotoshop(options = {}) {
       visible: true,
       opacity: 100,
       fillOpacity: 100,
+      blendMode: constants.BlendMode.NORMAL,
       allLocked: id === 11,
       pixelsLocked: id === 11,
       positionLocked: id === 11,
@@ -374,6 +526,7 @@ function makeLayer(document, id, name) {
     visible: true,
     opacity: 100,
     fillOpacity: 100,
+    blendMode: constants.BlendMode.NORMAL,
     allLocked: false,
     pixelsLocked: false,
     positionLocked: false,
@@ -399,12 +552,61 @@ function removeLayer(collection, target) {
   if (found) found.collection.splice(found.index, 1);
 }
 
+function createFakeImaging(options = {}) {
+  const calls = [];
+  let created = 0;
+  let disposed = 0;
+  let reads = 0;
+  let pixels = new Uint8Array([10, 20, 30, 255, 40, 50, 60, 255]);
+
+  return {
+    api: {
+      async getPixels(request) {
+        calls.push(request);
+        created += 1;
+        reads += 1;
+        if (options.mutateAfterFirstRead && reads > 1) {
+          pixels = new Uint8Array([11, 20, 30, 255, 40, 50, 60, 255]);
+        }
+        const snapshot = new Uint8Array(pixels);
+        let disposedOnce = false;
+        return {
+          imageData: {
+            async getData() {
+              if (options.failGetData) {
+                throw new Error("private imaging buffer path /Users/secret.psd");
+              }
+              return snapshot;
+            },
+            async dispose() {
+              if (disposedOnce) return;
+              disposedOnce = true;
+              disposed += 1;
+            },
+          },
+        };
+      },
+    },
+    get calls() {
+      return calls;
+    },
+    get created() {
+      return created;
+    },
+    get disposed() {
+      return disposed;
+    },
+  };
+}
+
 function assertSourcePristine(source) {
   assert.equal(source.id, 11);
   assert.equal(source.name, "Portrait");
+  assert.equal(source.parent, null);
   assert.equal(source.visible, true);
   assert.equal(source.opacity, 100);
   assert.equal(source.fillOpacity, 100);
+  assert.equal(source.blendMode, constants.BlendMode.NORMAL);
   assert.equal(source.allLocked, true);
   assert.equal(source.pixelsLocked, true);
   assert.equal(source.positionLocked, true);

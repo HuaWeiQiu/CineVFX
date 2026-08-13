@@ -21,11 +21,13 @@ const SOURCE_KEYS = Object.freeze([
   "visible",
   "opacity",
   "fillOpacity",
+  "blendMode",
   "allLocked",
   "pixelsLocked",
   "positionLocked",
   "transparentPixelsLocked",
 ]);
+const PIXEL_DIGEST_HEX = /^[a-f0-9]{64}$/;
 
 export class GlowHostError extends Error {
   /**
@@ -160,6 +162,11 @@ export function createPhotoshopGlowHost(options) {
               captureSourceSnapshot(current.document, current.layer),
               "revalidate",
             );
+            const pixelsBefore = await readSourcePixelDigest(
+              ps,
+              protectedSnapshot.documentId,
+              protectedSnapshot.id,
+            );
             assertNotCancelled(executionContext, "revalidate");
 
             const beforeIds = collectLayerIds(current.document);
@@ -256,6 +263,12 @@ export function createPhotoshopGlowHost(options) {
               captureSourceSnapshot(current.document, sourceAfter),
               "verify",
             );
+            const pixelsAfter = await readSourcePixelDigest(
+              ps,
+              protectedSnapshot.documentId,
+              protectedSnapshot.id,
+            );
+            assertPixelDigestUnchanged(pixelsBefore, pixelsAfter, "verify");
             verifyCreatedGraph({
               document: current.document,
               source: sourceAfter,
@@ -585,6 +598,7 @@ function captureSourceSnapshot(document, layer) {
     visible: layer.visible,
     opacity: finiteNumber(layer.opacity, "invalid_source", "snapshot"),
     fillOpacity: finiteNumber(layer.fillOpacity, "invalid_source", "snapshot"),
+    blendMode: captureBlendMode(layer),
     allLocked: booleanValue(layer.allLocked, "invalid_source", "snapshot"),
     pixelsLocked: booleanValue(layer.pixelsLocked, "invalid_source", "snapshot"),
     positionLocked: booleanValue(
@@ -610,6 +624,109 @@ function assertSourceUnchanged(before, after, stage) {
   if (!sameBounds(before.bounds, after.bounds)) {
     throw new GlowHostError("source_changed", stage);
   }
+}
+
+function captureBlendMode(layer) {
+  return layer.blendMode === undefined ? null : layer.blendMode;
+}
+
+function resolveGetPixels(ps) {
+  const imaging = ps?.imaging;
+  if (!imaging || typeof imaging !== "object") return null;
+  if (typeof imaging.getPixels !== "function") return null;
+  return imaging.getPixels.bind(imaging);
+}
+
+/**
+ * Read-only source-layer pixel digest. Missing Imaging API stays unverified
+ * and never invents a SHA-256 value. imageData is disposed before return.
+ */
+async function readSourcePixelDigest(ps, documentId, layerId) {
+  const getPixels = resolveGetPixels(ps);
+  if (!getPixels) {
+    return { verified: false, digest: null };
+  }
+
+  let imageData = null;
+  try {
+    let result;
+    try {
+      result = await getPixels({
+        documentID: documentId,
+        layerID: layerId,
+      });
+    } catch (error) {
+      imageData = extractImageData(error);
+      return { verified: false, digest: null };
+    }
+    imageData = extractImageData(result);
+    if (!imageData || typeof imageData.getData !== "function") {
+      return { verified: false, digest: null };
+    }
+    const data = await imageData.getData({ chunky: true });
+    const digest = await sha256Hex(data);
+    if (!PIXEL_DIGEST_HEX.test(digest ?? "")) {
+      return { verified: false, digest: null };
+    }
+    return { verified: true, digest };
+  } catch {
+    return { verified: false, digest: null };
+  } finally {
+    await disposeImageData(imageData);
+  }
+}
+
+function assertPixelDigestUnchanged(before, after, stage) {
+  if (!before.verified || !after.verified) return;
+  if (before.digest !== after.digest) {
+    throw new GlowHostError("source_changed", stage);
+  }
+}
+
+function extractImageData(value) {
+  if (!value || typeof value !== "object") return null;
+  if (typeof value.dispose === "function") return value;
+  const nested = value.imageData;
+  if (nested && typeof nested === "object") return nested;
+  return null;
+}
+
+async function disposeImageData(imageData) {
+  if (!imageData || typeof imageData.dispose !== "function") return;
+  try {
+    await imageData.dispose();
+  } catch {
+    // Dispose failures must not leak image bytes or host text.
+  }
+}
+
+async function sha256Hex(data) {
+  const bytes = toUint8Array(data);
+  if (!bytes) return null;
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle || typeof subtle.digest !== "function") return null;
+  try {
+    return hexFromBuffer(await subtle.digest("SHA-256", bytes));
+  } catch {
+    return null;
+  }
+}
+
+function toUint8Array(data) {
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  if (ArrayBuffer.isView(data)) {
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  }
+  return null;
+}
+
+function hexFromBuffer(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let hex = "";
+  for (let index = 0; index < bytes.length; index += 1) {
+    hex += bytes[index].toString(16).padStart(2, "0");
+  }
+  return hex;
 }
 
 function readBounds(layer, stage) {
